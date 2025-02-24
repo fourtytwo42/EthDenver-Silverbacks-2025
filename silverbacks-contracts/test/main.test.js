@@ -33,18 +33,18 @@ describe("Silverbacks Basic Tests", function() {
     await stableCoin.mint(addr1.address, ethers.utils.parseUnits("1000", 18));
   });
 
-  it("Should deposit $102, mint 1 NFT, and refund the remainder of 2", async () => {
+  it("Should deposit $102, mint 1 NFT with metadata, and refund the remainder of 2", async () => {
     // Approve the vault to spend 102 stablecoins from addr1.
     await stableCoin
       .connect(addr1)
       .approve(vault.address, ethers.utils.parseUnits("102", 18));
 
-    // Call deposit with 102 stablecoins; expect 1 NFT minted and 2 refunded.
+    // Call deposit with 102 stablecoins and a test metadata URI.
     await vault
       .connect(addr1)
-      .deposit(ethers.utils.parseUnits("102", 18), { gasLimit: 10000000 });
+      .deposit(ethers.utils.parseUnits("102", 18), "ipfs://test-metadata", { gasLimit: 10000000 });
 
-    // Compare NFT balance by converting BigNumber to string.
+    // Compare NFT balance.
     expect((await nft.balanceOf(addr1.address)).toString()).to.equal("1");
 
     // Check addr1's stablecoin balance:
@@ -57,6 +57,9 @@ describe("Silverbacks Basic Tests", function() {
 
     // Verify that the minted NFT (tokenId = 0) has a face value of 100.
     expect((await nft.faceValue(0)).toString()).to.equal("100");
+
+    // Verify that the tokenURI returns the metadata we passed.
+    expect(await nft.tokenURI(0)).to.equal("ipfs://test-metadata");
   });
 
   it("Should redeem an NFT and return stablecoins to the redeemer", async () => {
@@ -66,9 +69,9 @@ describe("Silverbacks Basic Tests", function() {
       .approve(vault.address, ethers.utils.parseUnits("200", 18));
     await vault
       .connect(addr1)
-      .deposit(ethers.utils.parseUnits("200", 18), { gasLimit: 10000000 });
+      .deposit(ethers.utils.parseUnits("200", 18), "ipfs://test-metadata", { gasLimit: 10000000 });
 
-    // Compare NFT balance by converting BigNumber to string.
+    // Verify that addr1 owns 2 NFTs.
     expect((await nft.balanceOf(addr1.address)).toString()).to.equal("2");
 
     // Redeem the NFT with tokenId 0.
