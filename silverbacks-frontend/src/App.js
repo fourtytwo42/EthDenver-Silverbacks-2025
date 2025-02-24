@@ -2,9 +2,9 @@ import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 
 // NOTE: Put your actual contract addresses here:
-const stableCoinAddress = "0x0C3a2419E2885B52B6E468cE24A0101160dF2215";
-const silverbacksNftAddress = "0xcfB147dadF551265872B70aF26B99A3560bd0Bc0";
-const vaultAddress = "0xf89155d3aBD782B41B9C6804d76f7ea61032A676";
+const stableCoinAddress = "0x92557Be585DA9256D0c472E6768C9fCf1621F236";
+const silverbacksNftAddress = "0x54E8B98673ED89301A7307daCa930671a8d83210";
+const vaultAddress = "0x1732b8Ed209Be0DE28020894f45E2346a0979d89";
 
 // Minimal ABI snippets
 const stableCoinABI = [
@@ -120,7 +120,7 @@ function App() {
       log("StableCoin balance (raw) = " + bal.toString());
       setStableCoinBalance(ethers.utils.formatEther(bal));
 
-      // Fetch NFT info
+      // Fetch NFT info using ERC721Enumerable's tokenOfOwnerByIndex
       const nftCount = await nftContract.balanceOf(currentAccount);
       const countNum = nftCount.toNumber();
       log("You own " + countNum + " Silverbacks NFTs.");
@@ -298,9 +298,7 @@ function App() {
         <p>Silverbacks Vault Demo &copy; 2025</p>
       </footer>
 
-      {/* 
-         Show debug logs for convenience
-      */}
+      {/* Debug Log */}
       <div style={{ backgroundColor: "#333", color: "#fff", padding: "0.5rem" }}>
         <h3>Debug Log</h3>
         <div style={{ maxHeight: "200px", overflowY: "auto" }}>
