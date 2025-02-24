@@ -30,50 +30,38 @@ describe("Silverbacks Basic Tests", function() {
     await stableCoin.mint(addr1.address, ethers.utils.parseUnits("1000", 18));
   });
 
-  it("Should deposit $102, get 1 NFT, and redeem the remainder of 2", async () => {
+  it("Should deposit $102, get 1 NFT, and refund the remainder of 2", async () => {
     // Approve vault to spend 102 from addr1
     await stableCoin.connect(addr1).approve(vault.address, ethers.utils.parseUnits("102", 18));
 
-    // deposit(102)
-    await vault.connect(addr1).deposit(ethers.utils.parseUnits("102", 18));
+    // Deposit with a generous gas limit
+    await vault.connect(addr1).deposit(ethers.utils.parseUnits("102", 18), { gasLimit: 10000000 });
 
     // Expect user to have 1 NFT
     expect(await nft.balanceOf(addr1.address)).to.equal(1);
 
-    // The remainder 2 should have been refunded
-    // So user spent exactly 100 in the vault
-    // Let's confirm stableCoin balance
+    // Check final stableCoin balance of addr1:
+    // addr1 started with 1000; $102 deposited: $100 locked, $2 refunded => final balance should be 900
     const finalBal = await stableCoin.balanceOf(addr1.address);
-    // minted 1000, deposit(102), remainder(2) refunded => finalBal ~ 900
-    // because 100 locked in vault
-    // We check if it's roughly 898 or so because 2 is refunded out of 102
-    // Actually let's do an exact approach
-    // minted 1000 => final bal = 898
-    // but we see 2 refunded => 900 left
-    // let's do a direct check
-    const expected = ethers.utils.parseUnits("898", 18);
-    // Because 100 tokens are locked in vault, 2 refunded -> 900 left
-    expect(finalBal).to.equal(expected);
+    expect(finalBal).to.equal(ethers.utils.parseUnits("900", 18));
 
-    // The NFT minted for 100 face value
+    // The NFT minted for a face value of 100
     const tokenId = 0;
     expect(await nft.faceValue(tokenId)).to.equal(100);
   });
 
-  it("Should redeem an NFT and get stablecoins back", async () => {
-    // Approve vault
+  it("Should redeem an NFT and return stablecoins to the redeemer", async () => {
+    // Approve vault and deposit $200 to get 2 NFTs for addr1
     await stableCoin.connect(addr1).approve(vault.address, ethers.utils.parseUnits("200", 18));
-    // deposit(200)
-    await vault.connect(addr1).deposit(ethers.utils.parseUnits("200", 18));
-    // user gets 2 NFTs (tokenIds 0,1)
+    await vault.connect(addr1).deposit(ethers.utils.parseUnits("200", 18), { gasLimit: 10000000 });
     expect(await nft.balanceOf(addr1.address)).to.equal(2);
 
-    // Now let's redeem tokenId=0
-    await vault.connect(addr1).redeem(0);
-    // user should receive 100 stable coins
+    // Redeem tokenId=0 with an override gas limit
+    await vault.connect(addr1).redeem(0, { gasLimit: 10000000 });
+
+    // After deposit: addr1 spent 200 locked; had 800 left.
+    // Redeeming tokenId 0 returns 100 stablecoins: final balance should be 900.
     const finalBal = await stableCoin.balanceOf(addr1.address);
-    // minted 1000 => after deposit(200) user left with 800
-    // redeem(0) => user gets 100 => finalBal=900
     expect(finalBal).to.equal(ethers.utils.parseUnits("900", 18));
   });
 });
