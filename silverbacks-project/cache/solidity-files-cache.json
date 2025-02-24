@@ -185,8 +185,8 @@
       ]
     },
     "C:\\Users\\hendo420\\Documents\\Github\\EthDenver-Silverbacks-2025\\silverbacks-project\\contracts\\SilverbacksVault.sol": {
-      "lastModificationDate": 1740414221898,
-      "contentHash": "ef24823433046fb5a372e9d41e9a38da",
+      "lastModificationDate": 1740416723774,
+      "contentHash": "eb6f70fa4aba1a6ed4cad28ecf10f931",
       "sourceName": "contracts/SilverbacksVault.sol",
       "solcConfig": {
         "version": "0.8.17",

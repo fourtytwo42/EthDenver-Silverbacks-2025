@@ -1,9 +1,9 @@
 ----------------------------------------
 C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\COMMIT_EDITMSG
 ----------------------------------------
-AI Template
+Updated contracts and tests
 
-Generated AI template to start with.
+Still having problems with testing
 
 ========================================
 
@@ -1013,11 +1013,21 @@ C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\info\exclude
 ========================================
 
 ----------------------------------------
+C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\info\refs
+----------------------------------------
+b03a49a6ac59875ea808e8e5fae5fd3ae5d9a675	refs/heads/main
+d165918cd4e80e842cb7f03abbf86ed3c8eb42e4	refs/remotes/origin/HEAD
+d165918cd4e80e842cb7f03abbf86ed3c8eb42e4	refs/remotes/origin/main
+
+========================================
+
+----------------------------------------
 C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\logs\HEAD
 ----------------------------------------
 0000000000000000000000000000000000000000 cbc113c60c493ff52fb8c33fc74222500540e35d fourtytwo42 <erics.cellphone@gmail.com> 1740406095 -0700	commit (initial): Initial commit
 cbc113c60c493ff52fb8c33fc74222500540e35d b119edd29b0836ccbb28e0811f1b275ae1fc8607 fourtytwo42 <erics.cellphone@gmail.com> 1740406177 -0700	commit: Updated gitignore
 b119edd29b0836ccbb28e0811f1b275ae1fc8607 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 fourtytwo42 <erics.cellphone@gmail.com> 1740412405 -0700	commit: AI Template
+d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 b03a49a6ac59875ea808e8e5fae5fd3ae5d9a675 fourtytwo42 <erics.cellphone@gmail.com> 1740414557 -0700	commit: Updated contracts and tests
 
 ========================================
 
@@ -1027,6 +1037,7 @@ C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\logs\refs\hea
 0000000000000000000000000000000000000000 cbc113c60c493ff52fb8c33fc74222500540e35d fourtytwo42 <erics.cellphone@gmail.com> 1740406095 -0700	commit (initial): Initial commit
 cbc113c60c493ff52fb8c33fc74222500540e35d b119edd29b0836ccbb28e0811f1b275ae1fc8607 fourtytwo42 <erics.cellphone@gmail.com> 1740406177 -0700	commit: Updated gitignore
 b119edd29b0836ccbb28e0811f1b275ae1fc8607 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 fourtytwo42 <erics.cellphone@gmail.com> 1740412405 -0700	commit: AI Template
+d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 b03a49a6ac59875ea808e8e5fae5fd3ae5d9a675 fourtytwo42 <erics.cellphone@gmail.com> 1740414557 -0700	commit: Updated contracts and tests
 
 ========================================
 
@@ -1039,6 +1050,8 @@ b119edd29b0836ccbb28e0811f1b275ae1fc8607 b119edd29b0836ccbb28e0811f1b275ae1fc860
 b119edd29b0836ccbb28e0811f1b275ae1fc8607 b119edd29b0836ccbb28e0811f1b275ae1fc8607 Eric Henderson <Hendo420@Silverbacks.cash> 1740410065 -0700	remote set-head
 b119edd29b0836ccbb28e0811f1b275ae1fc8607 b119edd29b0836ccbb28e0811f1b275ae1fc8607 Eric Henderson <Hendo420@Silverbacks.cash> 1740411890 -0700	remote set-head
 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 Eric Henderson <Hendo420@Silverbacks.cash> 1740412409 -0700	remote set-head
+d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 Eric Henderson <Hendo420@Silverbacks.cash> 1740414319 -0700	remote set-head
+d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 Eric Henderson <Hendo420@Silverbacks.cash> 1740416140 -0700	remote set-head
 
 ========================================
 
@@ -1052,9 +1065,19 @@ b119edd29b0836ccbb28e0811f1b275ae1fc8607 d165918cd4e80e842cb7f03abbf86ed3c8eb42e
 ========================================
 
 ----------------------------------------
-C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\refs\heads\main
+C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\objects\info\packs
 ----------------------------------------
-d165918cd4e80e842cb7f03abbf86ed3c8eb42e4
+P pack-2a2759ac725d5dbbb01a0704ae621806c0172215.pack
+
+
+========================================
+
+----------------------------------------
+C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\packed-refs
+----------------------------------------
+# pack-refs with: peeled fully-peeled sorted 
+b03a49a6ac59875ea808e8e5fae5fd3ae5d9a675 refs/heads/main
+d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 refs/remotes/origin/main
 
 ========================================
 
@@ -1062,13 +1085,6 @@ d165918cd4e80e842cb7f03abbf86ed3c8eb42e4
 C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\refs\remotes\origin\HEAD
 ----------------------------------------
 ref: refs/remotes/origin/main
-
-========================================
-
-----------------------------------------
-C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\refs\remotes\origin\main
-----------------------------------------
-d165918cd4e80e842cb7f03abbf86ed3c8eb42e4
 
 ========================================
 
@@ -1085,6 +1101,9 @@ C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.gitignore
 ----------------------------------------
 # env file
 .env
+
+#compiled contracts
+.json
 
 # Log file
 *.log
@@ -1128,19 +1147,21 @@ pragma solidity ^0.8.17;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 /**
+ * MyStableCoin:
  * A simple ERC20 token representing a "stablecoin" for the Silverbacks system.
  */
 contract MyStableCoin is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {
-        // Optionally mint initial supply to deployer if desired
-        // e.g.: _mint(msg.sender, 1000000 * 10**18);
+        // Optionally mint initial supply to deployer if desired.
+        // _mint(msg.sender, 1000000 * 10**18);
     }
 
     function mint(address to, uint256 amount) external {
-        // For testing or demonstration, a public mint function
+        // Public mint function for testing/demonstration.
         _mint(to, amount);
     }
 }
+
 ========================================
 
 ----------------------------------------
@@ -1150,79 +1171,68 @@ C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\silverbacks-projec
 pragma solidity ^0.8.17;
 
 import "hardhat/console.sol";  // For debugging/logging
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "./SilverbacksNFT.sol";
 
 /**
- * SilverbacksVault:
- * - Handles deposits of stablecoins and mints batch NFTs accordingly.
- * - Manages NFT redemption by burning NFTs and releasing locked stablecoins.
+ * SilverbacksNFT:
+ * Each token represents a $100 (or configurable) bill.
+ * The NFT includes metadata handling and a burn function.
  */
-contract SilverbacksVault is Ownable {
+contract SilverbacksNFT is ERC721, Ownable {
 
-    IERC20 public stableCoin;
-    SilverbacksNFT public silverbacksNFT;
+    // Mapping from tokenId to face value in stablecoin units (e.g., 100 for $100).
+    mapping (uint256 => uint256) public faceValue;
+    string private _baseTokenURI;
 
-    // Next token ID for minted NFTs.
-    uint256 public nextTokenId;
+    // The vault (main contract) can mint and burn tokens.
+    address public vaultContract;
 
-    event Deposited(address indexed depositor, uint256 depositAmount, uint256 mintedCount, uint256 remainder);
-    event Redeemed(address indexed redeemer, uint256 tokenId, uint256 faceValue);
+    event MintedSilverback(uint256 indexed tokenId, address indexed owner, uint256 value);
+    event BurnedSilverback(uint256 indexed tokenId, address indexed burner);
 
-    constructor(address _stableCoin, address _silverbacksNFT) {
-        stableCoin = IERC20(_stableCoin);
-        silverbacksNFT = SilverbacksNFT(_silverbacksNFT);
-        nextTokenId = 0;
+    constructor(string memory name, string memory symbol) ERC721(name, symbol) {
+        // Initialize base URI if needed.
+    }
+
+    function setVaultContract(address _vaultContract) external onlyOwner {
+        vaultContract = _vaultContract;
+    }
+
+    function setBaseURI(string memory baseURI) external onlyOwner {
+        _baseTokenURI = baseURI;
+    }
+
+    function _baseURI() internal view override returns (string memory) {
+        return _baseTokenURI;
     }
 
     /**
-     * Deposit stablecoins in multiples of $100. 
-     * If depositAmount is not a multiple of 100, remainder is refunded to user.
+     * Mint a new Silverback NFT.
+     * Can only be called by the contract owner or the designated vault contract.
      */
-    function deposit(uint256 depositAmount) external {
-        console.log("SilverbacksVault.deposit called by: %s", msg.sender);
-        console.log("Deposit amount: %s", depositAmount);
+    function mintNote(address to, uint256 tokenId, uint256 value) external {
+        console.log("SilverbacksNFT.mintNote called by: %s", msg.sender);
+        console.log("Parameters: to = %s, tokenId = %s, value = %s", to, tokenId, value);
 
-        require(depositAmount >= 100, "Minimum deposit is $100");
-        // Transfer stablecoins from user to this contract
-        require(stableCoin.transferFrom(msg.sender, address(this), depositAmount), "Transfer failed");
-
-        uint256 numFullNotes = depositAmount / 100;  // e.g., deposit 102 => 1 full note
-        uint256 remainder = depositAmount % 100;     // e.g., deposit 102 => remainder 2
-
-        if (remainder > 0) {
-            console.log("Refunding remainder: %s", remainder);
-            require(stableCoin.transfer(msg.sender, remainder), "Refund transfer failed");
-        }
-
-        // Mint an NFT for each full $100 note
-        for (uint256 i = 0; i < numFullNotes; i++) {
-            uint256 tokenId = nextTokenId;
-            nextTokenId++;
-            console.log("Minting NFT with tokenId: %s for depositor: %s", tokenId, msg.sender);
-            silverbacksNFT.mintNote(msg.sender, tokenId, 100);
-        }
-
-        emit Deposited(msg.sender, depositAmount, numFullNotes, remainder);
+        require(msg.sender == owner() || msg.sender == vaultContract, "Not authorized to mint");
+        _safeMint(to, tokenId);
+        faceValue[tokenId] = value;
+        console.log("NFT minted: tokenId = %s, face value = %s", tokenId, value);
+        emit MintedSilverback(tokenId, to, value);
     }
 
     /**
-     * Redeem an NFT and receive the corresponding stablecoins.
+     * Burn the NFT.
+     * Can be called by the token owner or the vault contract.
      */
-    function redeem(uint256 tokenId) external {
-        console.log("SilverbacksVault.redeem called by: %s for tokenId: %s", msg.sender, tokenId);
-        // Verify the redeemer is the owner of the NFT.
-        require(silverbacksNFT.ownerOf(tokenId) == msg.sender, "Not NFT owner");
-        uint256 value = silverbacksNFT.faceValue(tokenId);
-        console.log("Redeeming NFT with face value: %s", value);
-        // Burn the NFT (calls the burn function in SilverbacksNFT)
-        silverbacksNFT.burn(tokenId);
-
-        // Transfer stablecoins to user
-        require(stableCoin.transfer(msg.sender, value), "Stablecoin transfer failed");
-
-        emit Redeemed(msg.sender, tokenId, value);
+    function burn(uint256 tokenId) external {
+        console.log("SilverbacksNFT.burn called by: %s, tokenId: %s", msg.sender, tokenId);
+        require(_isApprovedOrOwner(msg.sender, tokenId) || msg.sender == vaultContract, "Not authorized to burn");
+        _burn(tokenId);
+        delete faceValue[tokenId];
+        console.log("NFT burned: tokenId = %s", tokenId);
+        emit BurnedSilverback(tokenId, msg.sender);
     }
 }
 
@@ -1243,14 +1253,28 @@ import "./SilverbacksNFT.sol";
  * SilverbacksVault:
  * - Handles deposits of stablecoins and mints batch NFTs accordingly.
  * - Manages NFT redemption by burning NFTs and releasing locked stablecoins.
+ *
+ * NOTE on decimals:
+ *   - The MyStableCoin is assumed to have 18 decimals (standard ERC-20).
+ *   - Each "Silverback" NFT is notionally worth $100, so in base ERC-20 units,
+ *     that is 100 * 10^18 = 100e18. We'll call this NOTE_SIZE.
+ *   - We store the NFT's faceValue as just "100" (an integer) so the tests can
+ *     compare to 100 directly. But when actually transferring stablecoins, we
+ *     multiply that faceValue by 1e18 to handle decimals correctly.
  */
 contract SilverbacksVault is Ownable {
 
+    // The underlying stablecoin contract (assumed 18 decimals).
     IERC20 public stableCoin;
+
+    // The Silverbacks NFT contract that this vault mints/burns.
     SilverbacksNFT public silverbacksNFT;
 
-    // Next token ID for minted NFTs.
+    // Next token ID to use when minting new NFTs.
     uint256 public nextTokenId;
+
+    // Each "silverback" represents $100 in stableCoin, i.e. 100 * 1e18 base units.
+    uint256 private constant NOTE_SIZE = 100 * 10**18;
 
     event Deposited(address indexed depositor, uint256 depositAmount, uint256 mintedCount, uint256 remainder);
     event Redeemed(address indexed redeemer, uint256 tokenId, uint256 faceValue);
@@ -1262,30 +1286,45 @@ contract SilverbacksVault is Ownable {
     }
 
     /**
-     * Deposit stablecoins in multiples of $100.
-     * If depositAmount is not a multiple of 100, the remainder is refunded.
+     * Deposit stablecoins in multiples of $100. If depositAmount is not a multiple
+     * of $100 * 1e18, the remainder is refunded to the user.
+     *
+     * Examples:
+     *  - If user deposits 102 * 1e18, that's "102 tokens". We mint 1 NFT
+     *    (for 100 tokens) and refund 2 tokens.
      */
     function deposit(uint256 depositAmount) external {
-        console.log("SilverbacksVault.deposit called by:", msg.sender);
-        console.log("Deposit amount:", depositAmount);
+        console.log("SilverbacksVault.deposit called by: %s", msg.sender);
+        console.log("Deposit amount: %s base units (i.e. 1e18 = 1 token)", depositAmount);
 
-        require(depositAmount >= 100, "Minimum deposit is $100");
-        // Transfer stablecoins from depositor to vault.
-        require(stableCoin.transferFrom(msg.sender, address(this), depositAmount), "Transfer failed");
+        require(depositAmount >= NOTE_SIZE, "Minimum deposit is $100 worth of tokens");
 
-        uint256 numFullNotes = depositAmount / 100;  // Integer division; e.g., 102 yields 1 note.
-        uint256 remainder = depositAmount % 100;     // e.g., 102 yields remainder 2.
+        // 1. Transfer stablecoins from user to this contract
+        require(
+            stableCoin.transferFrom(msg.sender, address(this), depositAmount),
+            "Transfer failed"
+        );
 
+        // 2. Figure out how many full "100 USD notes" we can mint
+        uint256 numFullNotes = depositAmount / NOTE_SIZE;
+        uint256 remainder    = depositAmount % NOTE_SIZE;
+
+        // 3. Refund remainder if any
         if (remainder > 0) {
-            console.log("Refunding remainder:", remainder);
-            require(stableCoin.transfer(msg.sender, remainder), "Refund transfer failed");
+            console.log("Refunding remainder: %s base units", remainder);
+            require(
+                stableCoin.transfer(msg.sender, remainder),
+                "Refund transfer failed"
+            );
         }
 
-        // Mint an NFT for each full $100 note.
+        // 4. Mint an NFT for each full $100
         for (uint256 i = 0; i < numFullNotes; i++) {
             uint256 tokenId = nextTokenId;
             nextTokenId++;
-            console.log("Minting NFT with tokenId:", tokenId, "for depositor:", msg.sender);
+            console.log("Minting NFT with tokenId: %s for depositor: %s", tokenId, msg.sender);
+
+            // The NFT's faceValue is stored as "100" (no decimals).
             silverbacksNFT.mintNote(msg.sender, tokenId, 100);
         }
 
@@ -1293,21 +1332,35 @@ contract SilverbacksVault is Ownable {
     }
 
     /**
-     * Redeem an NFT and receive the corresponding stablecoins.
+     * Redeem an NFT for stablecoins. The NFT must belong to the caller.
+     * We burn the NFT and transfer the stablecoins.
      */
     function redeem(uint256 tokenId) external {
-        console.log("SilverbacksVault.redeem called by:", msg.sender, "for tokenId:", tokenId);
-        // Verify the redeemer is the owner of the NFT.
+        console.log(
+            "SilverbacksVault.redeem called by: %s for tokenId: %s",
+            msg.sender,
+            tokenId
+        );
+
+        // 1. Verify the caller owns the NFT
         require(silverbacksNFT.ownerOf(tokenId) == msg.sender, "Not NFT owner");
-        uint256 value = silverbacksNFT.faceValue(tokenId);
-        console.log("Redeeming NFT with face value:", value);
-        // Burn the NFT (calls the burn function in the NFT contract).
+
+        // 2. Look up the integer faceValue in the NFT (e.g., 100)
+        uint256 nominalValue = silverbacksNFT.faceValue(tokenId);
+        console.log("Redeeming NFT with faceValue: %s (in 'whole tokens')", nominalValue);
+
+        // 3. Burn the NFT
         silverbacksNFT.burn(tokenId);
 
-        // Transfer the face value stablecoins back to the redeemer.
-        require(stableCoin.transfer(msg.sender, value), "Stablecoin transfer failed");
+        // 4. Transfer the stablecoins. Multiply by 1e18 because
+        //    'nominalValue=100' => '100 * 1e18' actual base units.
+        uint256 actualAmount = nominalValue * 10**18;
+        require(
+            stableCoin.transfer(msg.sender, actualAmount),
+            "Stablecoin transfer failed"
+        );
 
-        emit Redeemed(msg.sender, tokenId, value);
+        emit Redeemed(msg.sender, tokenId, nominalValue);
     }
 }
 
@@ -1325,6 +1378,8 @@ const { PRIVATE_KEY, RPC_URL } = process.env;
  * @type import('hardhat/config').HardhatUserConfig
  */
 module.exports = {
+  // Use Hardhat's built-in local network by default.
+  defaultNetwork: "hardhat",
   solidity: {
     version: "0.8.17",
     settings: {
@@ -1335,6 +1390,9 @@ module.exports = {
     }
   },
   networks: {
+    hardhat: {
+      // Hardhat's built-in network with default settings.
+    },
     localhost: {
       url: "http://127.0.0.1:8545"
     },
@@ -1344,6 +1402,7 @@ module.exports = {
     }
   }
 };
+
 ========================================
 
 ----------------------------------------
@@ -1390,74 +1449,78 @@ main()
     console.error("Error in deployment:", err);
     process.exit(1);
   });
+
 ========================================
 
 ----------------------------------------
 C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\silverbacks-project\test\main.test.js
 ----------------------------------------
 const { expect } = require("chai");
-const { ethers } = require("hardhat");
+const { ethers, network } = require("hardhat");
 
 describe("Silverbacks Basic Tests", function() {
   let stableCoin, nft, vault;
   let owner, addr1, addr2;
 
   beforeEach(async () => {
+    // Reset the Hardhat network to ensure a fresh state for every test run.
+    await network.provider.send("hardhat_reset", []);
+
     [owner, addr1, addr2] = await ethers.getSigners();
 
-    // Deploy stable coin
+    // Deploy the StableCoin contract.
     const StableCoin = await ethers.getContractFactory("MyStableCoin");
     stableCoin = await StableCoin.deploy("MyStableCoin", "MSC");
     await stableCoin.deployed();
 
-    // Deploy NFT
+    // Deploy the SilverbacksNFT contract.
     const SilverbacksNFT = await ethers.getContractFactory("SilverbacksNFT");
     nft = await SilverbacksNFT.deploy("SilverbacksNFT", "SBX");
     await nft.deployed();
 
-    // Deploy Vault
+    // Deploy the SilverbacksVault contract.
     const SilverbacksVault = await ethers.getContractFactory("SilverbacksVault");
     vault = await SilverbacksVault.deploy(stableCoin.address, nft.address);
     await vault.deployed();
 
-    // Set the vault contract in the NFT
+    // Set the vault contract address in the NFT contract.
     await nft.setVaultContract(vault.address);
 
-    // Mint some stablecoins to addr1 for testing
+    // Mint some stablecoins to addr1 for testing.
     await stableCoin.mint(addr1.address, ethers.utils.parseUnits("1000", 18));
   });
 
-  it("Should deposit $102, get 1 NFT, and refund the remainder of 2", async () => {
-    // Approve vault to spend 102 from addr1
+  it("Should deposit $102, mint 1 NFT, and refund the remainder of 2", async () => {
+    // Approve the vault to spend 102 stablecoins from addr1.
     await stableCoin.connect(addr1).approve(vault.address, ethers.utils.parseUnits("102", 18));
 
-    // Deposit with a generous gas limit
+    // Call deposit with 102 stablecoins; expect 1 NFT minted and 2 refunded.
     await vault.connect(addr1).deposit(ethers.utils.parseUnits("102", 18), { gasLimit: 10000000 });
 
-    // Expect user to have 1 NFT
+    // Verify that addr1 now holds exactly 1 NFT.
     expect(await nft.balanceOf(addr1.address)).to.equal(1);
 
-    // Check final stableCoin balance of addr1:
-    // addr1 started with 1000; $102 deposited: $100 locked, $2 refunded => final balance should be 900
+    // Check addr1's stablecoin balance:
+    // Starting balance: 1000, deposit used: 102, but 2 refunded, so 100 tokens locked => expected balance = 1000 - 100 = 900.
     const finalBal = await stableCoin.balanceOf(addr1.address);
     expect(finalBal).to.equal(ethers.utils.parseUnits("900", 18));
 
-    // The NFT minted for a face value of 100
+    // Verify that the minted NFT (tokenId = 0) has a face value of 100.
     const tokenId = 0;
     expect(await nft.faceValue(tokenId)).to.equal(100);
   });
 
   it("Should redeem an NFT and return stablecoins to the redeemer", async () => {
-    // Approve vault and deposit $200 to get 2 NFTs for addr1
+    // Approve the vault to spend 200 stablecoins and deposit $200 to mint 2 NFTs.
     await stableCoin.connect(addr1).approve(vault.address, ethers.utils.parseUnits("200", 18));
     await vault.connect(addr1).deposit(ethers.utils.parseUnits("200", 18), { gasLimit: 10000000 });
     expect(await nft.balanceOf(addr1.address)).to.equal(2);
 
-    // Redeem tokenId=0 with an override gas limit
+    // Redeem the NFT with tokenId 0.
     await vault.connect(addr1).redeem(0, { gasLimit: 10000000 });
 
-    // After deposit: addr1 spent 200 locked; had 800 left.
-    // Redeeming tokenId 0 returns 100 stablecoins: final balance should be 900.
+    // After depositing 200 stablecoins, addr1's balance would drop to 800.
+    // Redeeming tokenId 0 should return 100 stablecoins, so the final balance should be 900.
     const finalBal = await stableCoin.balanceOf(addr1.address);
     expect(finalBal).to.equal(ethers.utils.parseUnits("900", 18));
   });

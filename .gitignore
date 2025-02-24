@@ -1,6 +1,9 @@
 # env file
 .env
 
+#compiled contracts
+.json
+
 # Log file
 *.log
 
