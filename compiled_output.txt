@@ -1,9 +1,9 @@
 ----------------------------------------
 C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\COMMIT_EDITMSG
 ----------------------------------------
-Updated contracts and tests
+It's passing tests!!
 
-Still having problems with testing
+Fixed testing and contracts. :) Lets go!!
 
 ========================================
 
@@ -37,7 +37,7 @@ Silverbacks Entry to EthDenver 2025 Buidlathon
 ----------------------------------------
 C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\FETCH_HEAD
 ----------------------------------------
-d165918cd4e80e842cb7f03abbf86ed3c8eb42e4		branch 'main' of https://github.com/fourtytwo42/EthDenver-Silverbacks-2025
+c55fa5f84f5dfa5d06aff7a8ca98f191e245aff4		branch 'main' of https://github.com/fourtytwo42/EthDenver-Silverbacks-2025
 
 ========================================
 
@@ -1028,6 +1028,7 @@ C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\logs\HEAD
 cbc113c60c493ff52fb8c33fc74222500540e35d b119edd29b0836ccbb28e0811f1b275ae1fc8607 fourtytwo42 <erics.cellphone@gmail.com> 1740406177 -0700	commit: Updated gitignore
 b119edd29b0836ccbb28e0811f1b275ae1fc8607 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 fourtytwo42 <erics.cellphone@gmail.com> 1740412405 -0700	commit: AI Template
 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 b03a49a6ac59875ea808e8e5fae5fd3ae5d9a675 fourtytwo42 <erics.cellphone@gmail.com> 1740414557 -0700	commit: Updated contracts and tests
+b03a49a6ac59875ea808e8e5fae5fd3ae5d9a675 c55fa5f84f5dfa5d06aff7a8ca98f191e245aff4 fourtytwo42 <erics.cellphone@gmail.com> 1740417201 -0700	commit: It's passing tests!!
 
 ========================================
 
@@ -1038,6 +1039,7 @@ C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\logs\refs\hea
 cbc113c60c493ff52fb8c33fc74222500540e35d b119edd29b0836ccbb28e0811f1b275ae1fc8607 fourtytwo42 <erics.cellphone@gmail.com> 1740406177 -0700	commit: Updated gitignore
 b119edd29b0836ccbb28e0811f1b275ae1fc8607 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 fourtytwo42 <erics.cellphone@gmail.com> 1740412405 -0700	commit: AI Template
 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 b03a49a6ac59875ea808e8e5fae5fd3ae5d9a675 fourtytwo42 <erics.cellphone@gmail.com> 1740414557 -0700	commit: Updated contracts and tests
+b03a49a6ac59875ea808e8e5fae5fd3ae5d9a675 c55fa5f84f5dfa5d06aff7a8ca98f191e245aff4 fourtytwo42 <erics.cellphone@gmail.com> 1740417201 -0700	commit: It's passing tests!!
 
 ========================================
 
@@ -1052,6 +1054,7 @@ b119edd29b0836ccbb28e0811f1b275ae1fc8607 b119edd29b0836ccbb28e0811f1b275ae1fc860
 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 Eric Henderson <Hendo420@Silverbacks.cash> 1740412409 -0700	remote set-head
 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 Eric Henderson <Hendo420@Silverbacks.cash> 1740414319 -0700	remote set-head
 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 Eric Henderson <Hendo420@Silverbacks.cash> 1740416140 -0700	remote set-head
+c55fa5f84f5dfa5d06aff7a8ca98f191e245aff4 c55fa5f84f5dfa5d06aff7a8ca98f191e245aff4 Eric Henderson <Hendo420@Silverbacks.cash> 1740417283 -0700	remote set-head
 
 ========================================
 
@@ -1061,6 +1064,7 @@ C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\logs\refs\rem
 0000000000000000000000000000000000000000 cbc113c60c493ff52fb8c33fc74222500540e35d fourtytwo42 <erics.cellphone@gmail.com> 1740406113 -0700	update by push
 cbc113c60c493ff52fb8c33fc74222500540e35d b119edd29b0836ccbb28e0811f1b275ae1fc8607 fourtytwo42 <erics.cellphone@gmail.com> 1740406182 -0700	update by push
 b119edd29b0836ccbb28e0811f1b275ae1fc8607 d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 fourtytwo42 <erics.cellphone@gmail.com> 1740412408 -0700	update by push
+d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 c55fa5f84f5dfa5d06aff7a8ca98f191e245aff4 fourtytwo42 <erics.cellphone@gmail.com> 1740417282 -0700	update by push
 
 ========================================
 
@@ -1082,9 +1086,23 @@ d165918cd4e80e842cb7f03abbf86ed3c8eb42e4 refs/remotes/origin/main
 ========================================
 
 ----------------------------------------
+C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\refs\heads\main
+----------------------------------------
+c55fa5f84f5dfa5d06aff7a8ca98f191e245aff4
+
+========================================
+
+----------------------------------------
 C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\refs\remotes\origin\HEAD
 ----------------------------------------
 ref: refs/remotes/origin/main
+
+========================================
+
+----------------------------------------
+C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\.git\refs\remotes\origin\main
+----------------------------------------
+c55fa5f84f5dfa5d06aff7a8ca98f191e245aff4
 
 ========================================
 
@@ -1492,37 +1510,51 @@ describe("Silverbacks Basic Tests", function() {
 
   it("Should deposit $102, mint 1 NFT, and refund the remainder of 2", async () => {
     // Approve the vault to spend 102 stablecoins from addr1.
-    await stableCoin.connect(addr1).approve(vault.address, ethers.utils.parseUnits("102", 18));
+    await stableCoin
+      .connect(addr1)
+      .approve(vault.address, ethers.utils.parseUnits("102", 18));
 
     // Call deposit with 102 stablecoins; expect 1 NFT minted and 2 refunded.
-    await vault.connect(addr1).deposit(ethers.utils.parseUnits("102", 18), { gasLimit: 10000000 });
+    await vault
+      .connect(addr1)
+      .deposit(ethers.utils.parseUnits("102", 18), { gasLimit: 10000000 });
 
-    // Verify that addr1 now holds exactly 1 NFT.
-    expect(await nft.balanceOf(addr1.address)).to.equal(1);
+    // Compare NFT balance by converting BigNumber to string.
+    expect((await nft.balanceOf(addr1.address)).toString()).to.equal("1");
 
     // Check addr1's stablecoin balance:
-    // Starting balance: 1000, deposit used: 102, but 2 refunded, so 100 tokens locked => expected balance = 1000 - 100 = 900.
+    // Starting balance: 1000, deposit used: 102, but 2 refunded -> net locked = 100,
+    // so final balance should be 1000 - 100 = 900.
     const finalBal = await stableCoin.balanceOf(addr1.address);
-    expect(finalBal).to.equal(ethers.utils.parseUnits("900", 18));
+    expect(finalBal.toString()).to.equal(
+      ethers.utils.parseUnits("900", 18).toString()
+    );
 
     // Verify that the minted NFT (tokenId = 0) has a face value of 100.
-    const tokenId = 0;
-    expect(await nft.faceValue(tokenId)).to.equal(100);
+    expect((await nft.faceValue(0)).toString()).to.equal("100");
   });
 
   it("Should redeem an NFT and return stablecoins to the redeemer", async () => {
     // Approve the vault to spend 200 stablecoins and deposit $200 to mint 2 NFTs.
-    await stableCoin.connect(addr1).approve(vault.address, ethers.utils.parseUnits("200", 18));
-    await vault.connect(addr1).deposit(ethers.utils.parseUnits("200", 18), { gasLimit: 10000000 });
-    expect(await nft.balanceOf(addr1.address)).to.equal(2);
+    await stableCoin
+      .connect(addr1)
+      .approve(vault.address, ethers.utils.parseUnits("200", 18));
+    await vault
+      .connect(addr1)
+      .deposit(ethers.utils.parseUnits("200", 18), { gasLimit: 10000000 });
+
+    // Compare NFT balance by converting BigNumber to string.
+    expect((await nft.balanceOf(addr1.address)).toString()).to.equal("2");
 
     // Redeem the NFT with tokenId 0.
     await vault.connect(addr1).redeem(0, { gasLimit: 10000000 });
 
     // After depositing 200 stablecoins, addr1's balance would drop to 800.
-    // Redeeming tokenId 0 should return 100 stablecoins, so the final balance should be 900.
+    // Redeeming tokenId 0 returns 100 stablecoins, so final balance should be 900.
     const finalBal = await stableCoin.balanceOf(addr1.address);
-    expect(finalBal).to.equal(ethers.utils.parseUnits("900", 18));
+    expect(finalBal.toString()).to.equal(
+      ethers.utils.parseUnits("900", 18).toString()
+    );
   });
 });
 

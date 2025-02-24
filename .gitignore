@@ -1,11 +1,12 @@
 # env file
-.env
+*.env
 
 #compiled contracts
-.json
+*.json
 
 # Log file
 *.log
+*.txt
 
 # BlueJ files
 *.ctxt
