@@ -1,0 +1,14 @@
+# Dependencies
+node_modules
+/.pnp
+.pnp.js
+
+# Build
+build
+*.log
+
+# Temporary
+*.cache
+
+# dotenv environment files
+.env
