@@ -13,18 +13,25 @@ async function main() {
   await nft.deployed();
   console.log("SilverbacksNFT deployed at:", nft.address);
 
+  // Set the base URI for NFT metadata to your provided IPFS URL.
+  // Make sure your metadata JSON files (0.json, 1.json, etc.) are uploaded in this folder.
+  const baseURI = "https://rays-automobile-clearly.quicknode-ipfs.com/ipfs/";
+  let tx = await nft.setBaseURI(baseURI);
+  await tx.wait();
+  console.log("Base URI set for SilverbacksNFT:", baseURI);
+
   // 3) Deploy SilverbacksVault
   const SilverbacksVault = await ethers.getContractFactory("SilverbacksVault");
   const vault = await SilverbacksVault.deploy(stableCoin.address, nft.address);
   await vault.deployed();
   console.log("SilverbacksVault deployed at:", vault.address);
 
-  // Configure NFT so vault can mint/burn
-  let tx = await nft.setVaultContract(vault.address);
+  // Configure NFT so vault can mint/burn tokens.
+  tx = await nft.setVaultContract(vault.address);
   await tx.wait();
   console.log("Vault contract set in SilverbacksNFT");
 
-  // Optional: Mint some stablecoins for deployer to test
+  // Optional: Mint some stablecoins for deployer testing.
   const [deployer] = await ethers.getSigners();
   tx = await stableCoin.mint(deployer.address, ethers.utils.parseUnits("10000", 18));
   await tx.wait();

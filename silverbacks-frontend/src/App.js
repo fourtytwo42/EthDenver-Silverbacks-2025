@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 
-// NOTE: Put your actual contract addresses here:
-const stableCoinAddress = "0x92557Be585DA9256D0c472E6768C9fCf1621F236";
-const silverbacksNftAddress = "0x54E8B98673ED89301A7307daCa930671a8d83210";
-const vaultAddress = "0x1732b8Ed209Be0DE28020894f45E2346a0979d89";
+// Replace with your actual deployed contract addresses:
+const stableCoinAddress = "0xB20e23Cea6f3f1583783B5533E19497fA661Fe8c";
+const silverbacksNftAddress = "0x41d155e3f2049aC80A3fC7a7365A75E309290D03";
+const vaultAddress = "0x39da28f7909caAaE11863c1921d2Eb9D17D87156";
 
-// Minimal ABI snippets
+// Minimal ABI snippets with tokenURI added:
 const stableCoinABI = [
   "function balanceOf(address) view returns (uint256)",
   "function approve(address spender, uint256 value) returns (bool)",
@@ -18,6 +18,7 @@ const nftABI = [
   "function balanceOf(address) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   "function faceValue(uint256 tokenId) view returns (uint256)",
+  "function tokenURI(uint256 tokenId) view returns (string)"
 ];
 
 const vaultABI = [
@@ -28,17 +29,16 @@ const vaultABI = [
 function App() {
   const [currentAccount, setCurrentAccount] = useState(null);
   const [stableCoinBalance, setStableCoinBalance] = useState("0");
-  const [nfts, setNfts] = useState([]); // Array of { tokenId, faceValue }
-  const [depositAmount, setDepositAmount] = useState("100"); // Must be multiples of 100
+  // Array of objects: { tokenId, faceValue, imageFront, imageBack }
+  const [nfts, setNfts] = useState([]);
+  const [depositAmount, setDepositAmount] = useState("100");
   const [logMessages, setLogMessages] = useState([]);
 
-  // Helper: push logs to state and console
   const log = (msg) => {
     console.log(msg);
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // Connect wallet on button click
   const connectWallet = async () => {
     if (typeof window.ethereum === "undefined") {
       alert("MetaMask is not installed!");
@@ -48,8 +48,6 @@ function App() {
       const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
       setCurrentAccount(accounts[0]);
       log("Wallet connected: " + accounts[0]);
-
-      // Check network
       await ensureSepoliaNetwork();
     } catch (err) {
       console.error("Error connecting wallet:", err);
@@ -57,13 +55,11 @@ function App() {
     }
   };
 
-  // Ensures user is on Sepolia or tries to switch/add it
   const ensureSepoliaNetwork = async () => {
     if (!window.ethereum) return;
     try {
       const chainIdHex = await window.ethereum.request({ method: "eth_chainId" });
       if (chainIdHex.toLowerCase() !== "0xaa36a7") {
-        // chainId 11155111 decimal = 0xaa36a7 hex
         log("User is not on Sepolia. Attempting to switch or add the network...");
         try {
           await window.ethereum.request({
@@ -72,7 +68,6 @@ function App() {
           });
           log("Network switched to Sepolia successfully.");
         } catch (switchError) {
-          // If the chain hasn't been added to MetaMask, add it
           if (switchError.code === 4902) {
             log("Sepolia not found in MetaMask. Trying to add...");
             try {
@@ -81,11 +76,7 @@ function App() {
                 params: [{
                   chainId: "0xaa36a7",
                   chainName: "Sepolia Test Network",
-                  nativeCurrency: {
-                    name: "SepoliaETH",
-                    symbol: "ETH",
-                    decimals: 18
-                  },
+                  nativeCurrency: { name: "SepoliaETH", symbol: "ETH", decimals: 18 },
                   rpcUrls: ["https://rpc.sepolia.org"],
                   blockExplorerUrls: ["https://sepolia.etherscan.io"]
                 }]
@@ -106,7 +97,6 @@ function App() {
     }
   };
 
-  // Load stablecoin balance & NFT data
   const loadData = async () => {
     if (!currentAccount) return;
     if (!window.ethereum) return;
@@ -120,7 +110,6 @@ function App() {
       log("StableCoin balance (raw) = " + bal.toString());
       setStableCoinBalance(ethers.utils.formatEther(bal));
 
-      // Fetch NFT info using ERC721Enumerable's tokenOfOwnerByIndex
       const nftCount = await nftContract.balanceOf(currentAccount);
       const countNum = nftCount.toNumber();
       log("You own " + countNum + " Silverbacks NFTs.");
@@ -128,9 +117,23 @@ function App() {
       for (let i = 0; i < countNum; i++) {
         const tokenId = await nftContract.tokenOfOwnerByIndex(currentAccount, i);
         const faceValue = await nftContract.faceValue(tokenId);
+        const tokenURI = await nftContract.tokenURI(tokenId);
+        log(`Token ID ${tokenId} metadata URI: ${tokenURI}`);
+
+        let metadata = {};
+        try {
+          const response = await fetch(tokenURI);
+          metadata = await response.json();
+        } catch (err) {
+          log("Error fetching metadata for token " + tokenId + ": " + err.message);
+        }
         nftData.push({
           tokenId: tokenId.toString(),
-          faceValue: faceValue.toString()
+          faceValue: faceValue.toString(),
+          imageFront: metadata.imageFront || null,
+          imageBack: metadata.imageBack || null,
+          name: metadata.name || "",
+          description: metadata.description || ""
         });
       }
       setNfts(nftData);
@@ -140,7 +143,6 @@ function App() {
     }
   };
 
-  // Deposit stablecoins (in multiples of 100)
   const handleDeposit = async () => {
     if (!currentAccount) {
       alert("Please connect wallet first.");
@@ -151,13 +153,10 @@ function App() {
       alert("Invalid deposit amount.");
       return;
     }
-    // Ensure multiple of 100
     if (Number(rawAmount) % 100 !== 0) {
       alert("Deposit must be a multiple of 100!");
       return;
     }
-
-    // Check user balance first
     if (Number(rawAmount) > Number(stableCoinBalance)) {
       alert("You do not have enough stablecoins!");
       return;
@@ -169,21 +168,17 @@ function App() {
       const stableCoinContract = new ethers.Contract(stableCoinAddress, stableCoinABI, signer);
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
 
-      // Convert to 18 decimals
       const depositWei = ethers.utils.parseEther(rawAmount);
-      // Approve vault to spend depositWei
       let tx = await stableCoinContract.approve(vaultAddress, depositWei);
       log("Approving vault to spend " + rawAmount + " tokens...");
       await tx.wait();
       log("Approval transaction confirmed.");
 
-      // Now call vault.deposit
       tx = await vaultContract.deposit(depositWei);
       log("Depositing stablecoins to mint Silverbacks NFTs...");
       await tx.wait();
       log("Deposit transaction confirmed!");
 
-      // Reload data
       await loadData();
     } catch (err) {
       console.error("Error in deposit:", err);
@@ -191,7 +186,6 @@ function App() {
     }
   };
 
-  // Burn NFT
   const handleBurn = async (tokenId) => {
     if (!currentAccount) {
       alert("Please connect wallet first.");
@@ -207,7 +201,6 @@ function App() {
       await tx.wait();
       log("Redeem transaction confirmed!");
 
-      // Reload data
       await loadData();
     } catch (err) {
       console.error("Error burning NFT:", err);
@@ -217,7 +210,6 @@ function App() {
 
   useEffect(() => {
     if (window.ethereum) {
-      // When user changes accounts or network, reload relevant data
       window.ethereum.on("accountsChanged", (accounts) => {
         if (accounts.length > 0) {
           setCurrentAccount(accounts[0]);
@@ -229,7 +221,6 @@ function App() {
       });
       window.ethereum.on("chainChanged", (_chainId) => {
         log("Chain changed to: " + _chainId);
-        // Reload page or data
         window.location.reload();
       });
     }
@@ -248,13 +239,12 @@ function App() {
       </header>
       <main>
         <div className="container">
-          {!currentAccount && (
+          {!currentAccount ? (
             <div>
               <p>Connect your wallet to begin.</p>
               <button onClick={connectWallet}>Connect MetaMask</button>
             </div>
-          )}
-          {currentAccount && (
+          ) : (
             <div>
               <p>
                 Wallet Connected: <b>{currentAccount}</b>
@@ -274,8 +264,9 @@ function App() {
               <button onClick={handleDeposit}>Deposit & Mint</button>
               <hr />
               <h2>Your Silverbacks NFTs</h2>
-              {nfts.length === 0 && <p>You have no Silverbacks NFTs.</p>}
-              {nfts.length > 0 && (
+              {nfts.length === 0 ? (
+                <p>You have no Silverbacks NFTs.</p>
+              ) : (
                 <div className="nft-grid">
                   {nfts.map((n) => (
                     <div key={n.tokenId} className="nft-card">
@@ -285,6 +276,14 @@ function App() {
                       <p>
                         <b>Face Value:</b> {n.faceValue} USD
                       </p>
+                      {n.imageFront && n.imageBack ? (
+                        <div>
+                          <img src={n.imageFront} alt="Front" style={{ width: "100%", marginBottom: "0.5rem" }} />
+                          <img src={n.imageBack} alt="Back" style={{ width: "100%" }} />
+                        </div>
+                      ) : (
+                        <p>No images available.</p>
+                      )}
                       <button onClick={() => handleBurn(n.tokenId)}>Burn & Redeem</button>
                     </div>
                   ))}
@@ -297,15 +296,11 @@ function App() {
       <footer>
         <p>Silverbacks Vault Demo &copy; 2025</p>
       </footer>
-
-      {/* Debug Log */}
       <div style={{ backgroundColor: "#333", color: "#fff", padding: "0.5rem" }}>
         <h3>Debug Log</h3>
         <div style={{ maxHeight: "200px", overflowY: "auto" }}>
           {logMessages.map((msg, idx) => (
-            <p key={idx} style={{ margin: 0, fontFamily: "monospace" }}>
-              {msg}
-            </p>
+            <p key={idx} style={{ margin: 0, fontFamily: "monospace" }}>{msg}</p>
           ))}
         </div>
       </div>
