@@ -5,6 +5,8 @@ import "hardhat/console.sol";  // For debugging/logging
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./SilverbacksNFT.sol";
+// NEW: Import ECDSA for signature recovery.
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
 /**
  * SilverbacksVault:
@@ -19,12 +21,13 @@ import "./SilverbacksNFT.sol";
  *     stablecoins the faceValue is multiplied by 1e18.
  *
  * New Functions Added:
- *   - depositTo: Deposits stablecoins (from the caller) and mints an NFT
- *     to a specified recipient. (Only accepts exactly a $100 deposit.)
- *   - batchDeposit: Processes an array of recipients and corresponding metadata
- *     URIs. Each entry is treated as a deposit of exactly $100.
+ *   - depositTo and batchDeposit: see below.
+ *   - redeemWithAuth: allows a third party (paying gas) to redeem an NFT on behalf of the owner,
+ *     if the owner provides a signature (from the private key passed in via the redemption page).
  */
 contract SilverbacksVault is Ownable {
+    using ECDSA for bytes32;
+
     // The underlying stablecoin contract (assumed 18 decimals).
     IERC20 public stableCoin;
     // The Silverbacks NFT contract that this vault mints/burns.
@@ -144,8 +147,9 @@ contract SilverbacksVault is Ownable {
     }
 
     /**
-     * Redeem:
+     * redeem:
      * Burns an NFT owned by the caller and returns the corresponding stablecoins.
+     * (This version is used when the NFT owner is paying gas themselves.)
      */
     function redeem(uint256 tokenId) external {
         console.log("SilverbacksVault.redeem called by: %s for tokenId: %s", msg.sender, tokenId);
@@ -153,19 +157,44 @@ contract SilverbacksVault is Ownable {
         // Verify NFT ownership.
         require(silverbacksNFT.ownerOf(tokenId) == msg.sender, "Not NFT owner");
 
-        uint256 nominalValue = silverbacksNFT.faceValue(tokenId);
-        console.log("Redeeming NFT with faceValue: %s", nominalValue);
-
         // Burn the NFT.
         silverbacksNFT.burn(tokenId);
 
         // Transfer the stablecoins (multiply by 1e18).
-        uint256 actualAmount = nominalValue * 10**18;
+        uint256 actualAmount = 100 * 10**18;
         require(
             stableCoin.transfer(msg.sender, actualAmount),
             "Stablecoin transfer failed"
         );
 
-        emit Redeemed(msg.sender, tokenId, nominalValue);
+        emit Redeemed(msg.sender, tokenId, 100);
+    }
+
+    /**
+     * redeemWithAuth:
+     * Allows anyone (paying gas) to redeem an NFT on behalf of its owner.
+     * The NFT owner must have signed the message "Redeem:" concatenated with the tokenId.
+     * The signature is verified against the NFT owner’s address.
+     * The redeemed stablecoins are then transferred to the NFT owner.
+     */
+    function redeemWithAuth(uint256 tokenId, bytes calldata signature) external {
+        address nftOwner = silverbacksNFT.ownerOf(tokenId);
+        // Construct the message hash. (Make sure the same message is signed off‐chain.)
+        bytes32 messageHash = keccak256(abi.encodePacked("Redeem:", tokenId));
+        bytes32 ethSignedMessageHash = ECDSA.toEthSignedMessageHash(messageHash);
+        address recovered = ethSignedMessageHash.recover(signature);
+        require(recovered == nftOwner, "Invalid signature");
+
+        // Burn the NFT.
+        silverbacksNFT.burn(tokenId);
+
+        // Transfer stablecoins (each NFT is $100).
+        uint256 actualAmount = 100 * 10**18;
+        require(
+            stableCoin.transfer(nftOwner, actualAmount),
+            "Stablecoin transfer failed"
+        );
+
+        emit Redeemed(nftOwner, tokenId, 100);
     }
 }
