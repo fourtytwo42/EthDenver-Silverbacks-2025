@@ -3,10 +3,10 @@ import { ethers } from "ethers";
 import chains from "./chains.json";
 
 const ChainSelector = () => {
-  const [currentChain, setCurrentChain] = useState(null);
-  const [supported, setSupported] = useState(true);
-  const [selectedChainId, setSelectedChainId] = useState("");
+  const [currentChain, setCurrentChain] = useState("");
+  const [isSupported, setIsSupported] = useState(true);
 
+  // Fetch the current chain from MetaMask and update state.
   const fetchCurrentChain = async () => {
     if (window.ethereum) {
       try {
@@ -14,7 +14,7 @@ const ChainSelector = () => {
         const network = await provider.getNetwork();
         const chainIdHex = "0x" + network.chainId.toString(16);
         setCurrentChain(chainIdHex);
-        setSupported(!!chains[chainIdHex]);
+        setIsSupported(!!chains[chainIdHex]);
       } catch (error) {
         console.error("Error fetching network:", error);
       }
@@ -23,21 +23,32 @@ const ChainSelector = () => {
 
   useEffect(() => {
     fetchCurrentChain();
+    // Listen for chain changes.
     if (window.ethereum) {
-      window.ethereum.on("chainChanged", (chainId) => {
+      const handleChainChanged = (chainId) => {
         setCurrentChain(chainId);
-        setSupported(!!chains[chainId]);
-      });
+        setIsSupported(!!chains[chainId]);
+      };
+      window.ethereum.on("chainChanged", handleChainChanged);
+      return () => {
+        if (window.ethereum.removeListener) {
+          window.ethereum.removeListener("chainChanged", handleChainChanged);
+        }
+      };
     }
   }, []);
 
+  // Attempt to switch the network.
   const switchNetwork = async (targetChainId) => {
+    if (!window.ethereum) return;
     try {
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
-        params: [{ chainId: targetChainId }]
+        params: [{ chainId: targetChainId }],
       });
+      fetchCurrentChain();
     } catch (switchError) {
+      // If the chain is not added to MetaMask, attempt to add it.
       if (switchError.code === 4902) {
         const chainData = chains[targetChainId];
         if (!chainData) {
@@ -48,8 +59,9 @@ const ChainSelector = () => {
         try {
           await window.ethereum.request({
             method: "wallet_addEthereumChain",
-            params: [paramsWithoutContracts]
+            params: [paramsWithoutContracts],
           });
+          fetchCurrentChain();
         } catch (addError) {
           console.error("Error adding chain:", addError);
         }
@@ -59,48 +71,28 @@ const ChainSelector = () => {
     }
   };
 
-  const handleSelectChange = (e) => {
-    const targetChainId = e.target.value;
-    setSelectedChainId(targetChainId);
-  };
-
-  const handleSwitchClick = async () => {
-    if (selectedChainId) {
-      await switchNetwork(selectedChainId);
-      fetchCurrentChain();
+  // When the user selects a different network, immediately trigger the switch.
+  const handleChainChange = async (e) => {
+    const newChain = e.target.value;
+    if (newChain !== currentChain) {
+      await switchNetwork(newChain);
     }
   };
 
   return (
     <div style={{ display: "flex", alignItems: "center" }}>
-      {currentChain ? (
-        <>
-          <p style={{ margin: 0, fontSize: "0.9rem" }}>
-            {supported
-              ? `${chains[currentChain].chainName} (${currentChain})`
-              : `Unsupported network (${currentChain})`}
-          </p>
-          {!supported && (
-            <div style={{ marginLeft: "1rem" }}>
-              <select onChange={handleSelectChange} defaultValue="">
-                <option value="" disabled>
-                  -- Select Network --
-                </option>
-                {Object.keys(chains).map((chainId) => (
-                  <option key={chainId} value={chainId}>
-                    {chains[chainId].chainName} ({chainId})
-                  </option>
-                ))}
-              </select>
-              <button onClick={handleSwitchClick} style={{ marginLeft: "0.5rem" }}>
-                Switch
-              </button>
-            </div>
-          )}
-        </>
-      ) : (
-        <p>Loading network info…</p>
-      )}
+      <p style={{ margin: 0, fontSize: "0.9rem", marginRight: "0.5rem" }}>
+        {isSupported
+          ? `${chains[currentChain]?.chainName || "Unknown"} (${currentChain})`
+          : `Unsupported network (${currentChain})`}
+      </p>
+      <select value={currentChain} onChange={handleChainChange}>
+        {Object.keys(chains).map((chainId) => (
+          <option key={chainId} value={chainId}>
+            {chains[chainId].chainName} ({chainId})
+          </option>
+        ))}
+      </select>
     </div>
   );
 };

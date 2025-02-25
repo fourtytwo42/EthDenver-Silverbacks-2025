@@ -43,6 +43,7 @@ const AdminPage = ({ currentAccount }) => {
   const [nfts, setNfts] = useState([]);
   const [logMessages, setLogMessages] = useState([]);
   const [contractAddresses, setContractAddresses] = useState(null);
+  const [erc20Balance, setErc20Balance] = useState(null);
 
   const log = (msg) => {
     console.log(msg);
@@ -71,7 +72,7 @@ const AdminPage = ({ currentAccount }) => {
     loadContractAddresses();
   }, []);
 
-  // Function to load admin NFT data
+  // Function to load admin NFT data and ERC20 balance
   const loadData = async () => {
     if (!currentAccount || !window.ethereum || !contractAddresses) return;
     const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -80,6 +81,7 @@ const AdminPage = ({ currentAccount }) => {
     try {
       const bal = await stableCoinContract.balanceOf(currentAccount);
       log("StableCoin balance (raw) = " + bal.toString());
+      setErc20Balance(ethers.utils.formatEther(bal));
       const nftCount = await nftContract.balanceOf(currentAccount);
       log("You own " + nftCount.toNumber() + " Silverbacks NFTs.");
       const nftData = [];
@@ -362,6 +364,22 @@ const AdminPage = ({ currentAccount }) => {
           <p>
             Wallet Connected: <strong>{currentAccount}</strong>
           </p>
+          {/* Display contract addresses and ERC20 token balance */}
+          {contractAddresses && (
+            <div style={infoContainerStyle}>
+              <p>
+                <strong>ERC20 (StableCoin) Address:</strong> {contractAddresses.stableCoin}
+              </p>
+              <p>
+                <strong>ERC721 (SilverbacksNFT) Address:</strong> {contractAddresses.silverbacksNFT}
+              </p>
+              {erc20Balance !== null && (
+                <p>
+                  <strong>Your ERC20 Balance:</strong> {erc20Balance} tokens
+                </p>
+              )}
+            </div>
+          )}
           <div style={sectionStyle}>
             <h2>Mint Silverbacks (to Self)</h2>
             <p>Deposit must be a multiple of 100. You’ll receive 1 NFT per $100 deposited.</p>
@@ -480,7 +498,12 @@ const pageContainerStyle = {
   margin: "2rem auto",
   maxWidth: "900px"
 };
-
+const infoContainerStyle = {
+  marginBottom: "1rem",
+  padding: "1rem",
+  backgroundColor: "#e9ecef",
+  borderRadius: "8px"
+};
 const sectionStyle = { marginBottom: "1.5rem" };
 const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "1rem" };
 const inputStyle = { padding: "0.5rem", fontSize: "1rem" };

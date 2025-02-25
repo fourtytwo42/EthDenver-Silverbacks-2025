@@ -1,30 +1,76 @@
 const { ethers } = require("hardhat");
+const fs = require("fs");
+const path = require("path");
+
+/**
+ * Helper function to deploy a contract.
+ * @param {ContractFactory} contractFactory - The factory object.
+ * @param {string} contractName - A string to use for logging (the contract's name).
+ * @param  {...any} args - The constructor arguments.
+ *
+ * This function estimates the deployment gas cost and logs:
+ * - The deployer address,
+ * - The estimated cost (in ETH),
+ * - And, if an error occurs because the balance is insufficient, the deployer's balance.
+ */
+async function deployContract(contractFactory, contractName, ...args) {
+  const [deployer] = await ethers.getSigners();
+  console.log(`Deploying ${contractName} from address: ${deployer.address}`);
+  let estimatedGas, gasPrice, estimatedCost;
+  try {
+    // Prepare the deployment transaction and estimate gas usage.
+    const deployTx = contractFactory.getDeployTransaction(...args);
+    estimatedGas = await deployer.estimateGas(deployTx);
+    gasPrice = await deployer.getGasPrice();
+    estimatedCost = estimatedGas.mul(gasPrice);
+    console.log(
+      `Estimated cost for ${contractName} deployment: ${ethers.utils.formatEther(estimatedCost)} ETH`
+    );
+  } catch (err) {
+    console.error("Error estimating gas: ", err.message);
+  }
+  try {
+    const instance = await contractFactory.deploy(...args);
+    await instance.deployed();
+    console.log(`${contractName} deployed at: ${instance.address}`);
+    return instance;
+  } catch (err) {
+    if (err.message.includes("Upfront cost exceeds account balance")) {
+      const balance = await deployer.getBalance();
+      console.error("Upfront cost exceeds account balance");
+      console.error(`Deployer address: ${deployer.address}`);
+      console.error(`Deployer balance: ${ethers.utils.formatEther(balance)} ETH`);
+      if (estimatedCost) {
+        console.error(`Estimated cost: ${ethers.utils.formatEther(estimatedCost)} ETH`);
+      }
+    }
+    throw err;
+  }
+}
 
 async function main() {
-  // 1) Deploy MyStableCoin
-  const StableCoin = await ethers.getContractFactory("MyStableCoin");
-  const stableCoin = await StableCoin.deploy("MyStableCoin", "MSC");
-  await stableCoin.deployed();
-  console.log("StableCoin deployed at:", stableCoin.address);
+  // Log the deployer address before starting deployments.
+  const [deployer] = await ethers.getSigners();
+  console.log("Starting deployment with deployer address:", deployer.address);
 
-  // 2) Deploy SilverbacksNFT
-  const SilverbacksNFT = await ethers.getContractFactory("SilverbacksNFT");
-  const nft = await SilverbacksNFT.deploy("SilverbacksNFT", "SBX");
-  await nft.deployed();
-  console.log("SilverbacksNFT deployed at:", nft.address);
+  // 1) Deploy MyStableCoin (constructor: (string name, string symbol))
+  const StableCoinFactory = await ethers.getContractFactory("MyStableCoin");
+  // Pass both the token name and symbol.
+  const stableCoin = await deployContract(StableCoinFactory, "MyStableCoin", "MyStableCoin", "MSC");
 
-  // Set the base URI for NFT metadata to your provided IPFS URL.
-  // Make sure your metadata JSON files (0.json, 1.json, etc.) are uploaded in this folder.
-  const baseURI = "https://rays-automobile-clearly.quicknode-ipfs.com/ipfs/";
-  let tx = await nft.setBaseURI(baseURI);
+  // 2) Deploy SilverbacksNFT (constructor: (string name, string symbol))
+  const SilverbacksNFTFactory = await ethers.getContractFactory("SilverbacksNFT");
+  // Pass both the NFT name and symbol.
+  const nft = await deployContract(SilverbacksNFTFactory, "SilverbacksNFT", "SilverbacksNFT", "SBX");
+
+  // Set the base URI for NFT metadata.
+  let tx = await nft.setBaseURI("https://rays-automobile-clearly.quicknode-ipfs.com/ipfs/");
   await tx.wait();
-  console.log("Base URI set for SilverbacksNFT:", baseURI);
+  console.log("Base URI set for SilverbacksNFT");
 
-  // 3) Deploy SilverbacksVault
-  const SilverbacksVault = await ethers.getContractFactory("SilverbacksVault");
-  const vault = await SilverbacksVault.deploy(stableCoin.address, nft.address);
-  await vault.deployed();
-  console.log("SilverbacksVault deployed at:", vault.address);
+  // 3) Deploy SilverbacksVault (constructor: (address stableCoin, address silverbacksNFT))
+  const SilverbacksVaultFactory = await ethers.getContractFactory("SilverbacksVault");
+  const vault = await deployContract(SilverbacksVaultFactory, "SilverbacksVault", stableCoin.address, nft.address);
 
   // Configure NFT so vault can mint/burn tokens.
   tx = await nft.setVaultContract(vault.address);
@@ -32,10 +78,84 @@ async function main() {
   console.log("Vault contract set in SilverbacksNFT");
 
   // Optional: Mint some stablecoins for deployer testing.
-  const [deployer] = await ethers.getSigners();
   tx = await stableCoin.mint(deployer.address, ethers.utils.parseUnits("10000", 18));
   await tx.wait();
   console.log("Minted 10000 stablecoins to deployer.");
+
+  // Retrieve additional token details.
+  const stableCoinName = await stableCoin.name();
+  const stableCoinSymbol = await stableCoin.symbol();
+  const stableCoinDecimals = await stableCoin.decimals();
+  const nftName = await nft.name();
+  const nftSymbol = await nft.symbol();
+
+  // Get current network details.
+  const network = await ethers.provider.getNetwork();
+  const chainIdHex = "0x" + network.chainId.toString(16);
+
+  // Define extra chain metadata.
+  const chainDataMap = {
+    11155111: { // Sepolia
+      chainName: "sepolia",
+      rpc: process.env.RPC_URL || "",
+      explorer: "https://sepolia.etherscan.io"
+    },
+    59141: { // Linea Sepolia (using the chain id where you have funds)
+      chainName: "Linea Sepolia",
+      rpc: process.env.LINEA_RPC_URL || "",
+      explorer: "https://sepolia.lineascan.build"
+    },
+    31337: { // Hardhat local network
+      chainName: "Hardhat",
+      rpc: "http://127.0.0.1:8545",
+      explorer: ""
+    }
+  };
+  const extraChainData = chainDataMap[network.chainId] || {
+    chainName: network.name,
+    rpc: "",
+    explorer: ""
+  };
+
+  // Write deployment addresses and metadata to chains.json.
+  const chainsFilePath = path.join(__dirname, "..", "chains.json");
+  let chains = {};
+  if (fs.existsSync(chainsFilePath)) {
+    try {
+      const data = fs.readFileSync(chainsFilePath, "utf8");
+      chains = JSON.parse(data);
+    } catch (err) {
+      console.error("Error reading chains.json:", err);
+    }
+  }
+
+  // If the chain already exists, only update the contracts object.
+  if (chains[chainIdHex]) {
+    chains[chainIdHex].contracts = {
+      stableCoin: stableCoin.address,
+      silverbacksNFT: nft.address,
+      vault: vault.address
+    };
+  } else {
+    chains[chainIdHex] = {
+      chainId: network.chainId,
+      chainName: extraChainData.chainName,
+      rpc: extraChainData.rpc,
+      explorer: extraChainData.explorer,
+      contracts: {
+        stableCoin: stableCoin.address,
+        silverbacksNFT: nft.address,
+        vault: vault.address
+      }
+    };
+  }
+
+  try {
+    fs.writeFileSync(chainsFilePath, JSON.stringify(chains, null, 2));
+    console.log("Updated chains.json with deployment addresses for chain", chainIdHex);
+  } catch (err) {
+    console.error("Error writing chains.json:", err);
+  }
 
   console.log("Deployment complete.");
 }
