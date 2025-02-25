@@ -11,7 +11,6 @@ const stableCoinABI = [
   "function decimals() view returns (uint8)",
   "function mint(address to, uint256 amount) external"
 ];
-
 const nftABI = [
   "function balanceOf(address) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
@@ -19,7 +18,6 @@ const nftABI = [
   "function tokenURI(uint256 tokenId) view returns (string)",
   "function safeTransferFrom(address from, address to, uint256 tokenId)"
 ];
-
 const vaultABI = [
   "function deposit(uint256 depositAmount, string metadataURI) external",
   "function depositTo(address recipient, uint256 depositAmount, string metadataURI) external",
@@ -27,14 +25,10 @@ const vaultABI = [
   "function redeem(uint256 tokenId) external"
 ];
 
-// Create an IPFS client using your node’s API endpoint.
 const ipfsClient = create({ url: "https://silverbacksipfs.online/api/v0" });
-
-// Maximum file size allowed (5 MB)
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB in bytes
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 
 const AdminPage = ({ currentAccount }) => {
-  // States for deposit/mint functionality
   const [depositAmount, setDepositAmount] = useState("100");
   const [depositRecipient, setDepositRecipient] = useState("");
   const [frontImageFile, setFrontImageFile] = useState(null);
@@ -50,7 +44,6 @@ const AdminPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // Load contract addresses from chains.json based on current network
   useEffect(() => {
     async function loadContractAddresses() {
       if (window.ethereum) {
@@ -72,12 +65,19 @@ const AdminPage = ({ currentAccount }) => {
     loadContractAddresses();
   }, []);
 
-  // Function to load admin NFT data and ERC20 balance
   const loadData = async () => {
     if (!currentAccount || !window.ethereum || !contractAddresses) return;
     const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
-    const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
+    const stableCoinContract = new ethers.Contract(
+      contractAddresses.stableCoin,
+      stableCoinABI,
+      provider
+    );
+    const nftContract = new ethers.Contract(
+      contractAddresses.silverbacksNFT,
+      nftABI,
+      provider
+    );
     try {
       const bal = await stableCoinContract.balanceOf(currentAccount);
       log("StableCoin balance (raw) = " + bal.toString());
@@ -92,7 +92,9 @@ const AdminPage = ({ currentAccount }) => {
         log(`Token ID ${tokenId} metadata URI: ${tokenURI}`);
         let metadata = {};
         try {
-          const response = await fetch("https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7));
+          const response = await fetch(
+            "https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7)
+          );
           metadata = await response.json();
         } catch (err) {
           log("Error fetching metadata for token " + tokenId + ": " + err.message);
@@ -118,8 +120,6 @@ const AdminPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // HANDLERS
-
   const handleDeposit = async () => {
     if (!frontImageFile || !backImageFile) {
       alert("Please select both front and back images.");
@@ -134,11 +134,9 @@ const AdminPage = ({ currentAccount }) => {
       const frontAdded = await ipfsClient.add(frontImageFile);
       const frontImageCID = frontAdded.path;
       log("Front image uploaded with CID: " + frontImageCID);
-
       const backAdded = await ipfsClient.add(backImageFile);
       const backImageCID = backAdded.path;
       log("Back image uploaded with CID: " + backImageCID);
-
       const metadata = {
         name: "Silverback NFT",
         description: "An NFT representing a $100 bill.",
@@ -150,11 +148,18 @@ const AdminPage = ({ currentAccount }) => {
       const metadataCID = metadataAdded.path;
       const metaURI = "ipfs://" + metadataCID;
       log("Metadata JSON uploaded with URI: " + metaURI);
-
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
-      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
+      const stableCoinContract = new ethers.Contract(
+        contractAddresses.stableCoin,
+        stableCoinABI,
+        signer
+      );
+      const vaultContract = new ethers.Contract(
+        contractAddresses.vault,
+        vaultABI,
+        signer
+      );
       const depositWei = ethers.utils.parseEther(rawAmount);
       let tx = await stableCoinContract.approve(contractAddresses.vault, depositWei);
       log("Approving vault to spend " + rawAmount + " tokens...");
@@ -183,11 +188,9 @@ const AdminPage = ({ currentAccount }) => {
       const frontAdded = await ipfsClient.add(frontImageFile);
       const frontImageCID = frontAdded.path;
       log("Front image uploaded with CID: " + frontImageCID);
-
       const backAdded = await ipfsClient.add(backImageFile);
       const backImageCID = backAdded.path;
       log("Back image uploaded with CID: " + backImageCID);
-
       const metadata = {
         name: "Silverback NFT",
         description: "An NFT representing a $100 bill.",
@@ -199,16 +202,23 @@ const AdminPage = ({ currentAccount }) => {
       const metadataCID = metadataAdded.path;
       const metaURI = "ipfs://" + metadataCID;
       log("Metadata JSON uploaded with URI: " + metaURI);
-
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const depositWei = ethers.utils.parseEther("100");
-      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
+      const stableCoinContract = new ethers.Contract(
+        contractAddresses.stableCoin,
+        stableCoinABI,
+        signer
+      );
       let approveTx = await stableCoinContract.approve(contractAddresses.vault, depositWei);
       log("Approving vault to spend 100 tokens...");
       await approveTx.wait();
       log("Approval confirmed.");
-      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
+      const vaultContract = new ethers.Contract(
+        contractAddresses.vault,
+        vaultABI,
+        signer
+      );
       let tx = await vaultContract.depositTo(depositRecipient, depositWei, metaURI);
       log("Depositing stablecoins and minting NFT to " + depositRecipient + "...");
       await tx.wait();
@@ -258,12 +268,20 @@ const AdminPage = ({ currentAccount }) => {
       const totalDeposit = ethers.utils.parseEther((recipients.length * 100).toString());
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
+      const stableCoinContract = new ethers.Contract(
+        contractAddresses.stableCoin,
+        stableCoinABI,
+        signer
+      );
       let tx = await stableCoinContract.approve(contractAddresses.vault, totalDeposit);
       log("Approving vault for batch deposit of " + (recipients.length * 100) + " tokens...");
       await tx.wait();
       log("Approval confirmed.");
-      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
+      const vaultContract = new ethers.Contract(
+        contractAddresses.vault,
+        vaultABI,
+        signer
+      );
       tx = await vaultContract.batchDeposit(recipients, metadataURIs);
       log("Batch deposit transaction submitted...");
       await tx.wait();
@@ -309,39 +327,6 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // File input handlers
-  const handleFrontImageChange = (e) => {
-    if (e.target.files.length > 0) {
-      const file = e.target.files[0];
-      if (file.size > MAX_FILE_SIZE) {
-        alert("Front image is too large. Please select an image smaller than 5 MB.");
-        return;
-      }
-      setFrontImageFile(file);
-      log("Front image selected: " + file.name);
-    }
-  };
-
-  const handleBackImageChange = (e) => {
-    if (e.target.files.length > 0) {
-      const file = e.target.files[0];
-      if (file.size > MAX_FILE_SIZE) {
-        alert("Back image is too large. Please select an image smaller than 5 MB.");
-        return;
-      }
-      setBackImageFile(file);
-      log("Back image selected: " + file.name);
-    }
-  };
-
-  const handleCSVFileChange = (e) => {
-    if (e.target.files.length > 0) {
-      const file = e.target.files[0];
-      setCsvFile(file);
-      log("CSV file selected: " + file.name);
-    }
-  };
-
   useEffect(() => {
     if (window.ethereum) {
       window.ethereum.on("accountsChanged", (accounts) => {
@@ -357,161 +342,263 @@ const AdminPage = ({ currentAccount }) => {
   }, []);
 
   return (
-    <div style={pageContainerStyle}>
-      <h1>Admin Dashboard</h1>
+    <div className="container">
+      <h1 className="center-align">Admin Dashboard</h1>
       {currentAccount ? (
         <>
-          <p>
-            Wallet Connected: <strong>{currentAccount}</strong>
-          </p>
-          {/* Display contract addresses and ERC20 token balance */}
-          {contractAddresses && (
-            <div style={infoContainerStyle}>
-              <p>
-                <strong>ERC20 (StableCoin) Address:</strong> {contractAddresses.stableCoin}
-              </p>
-              <p>
-                <strong>ERC721 (SilverbacksNFT) Address:</strong> {contractAddresses.silverbacksNFT}
-              </p>
-              {erc20Balance !== null && (
+          <div className="card-panel teal lighten-4">
+            <p>
+              Wallet Connected: <strong>{currentAccount}</strong>
+            </p>
+            {contractAddresses && (
+              <>
                 <p>
-                  <strong>Your ERC20 Balance:</strong> {erc20Balance} tokens
+                  <strong>ERC20 (StableCoin) Address:</strong> {contractAddresses.stableCoin}
                 </p>
-              )}
+                <p>
+                  <strong>ERC721 (SilverbacksNFT) Address:</strong> {contractAddresses.silverbacksNFT}
+                </p>
+                {erc20Balance !== null && (
+                  <p>
+                    <strong>Your ERC20 Balance:</strong> {erc20Balance} tokens
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Mint Silverbacks (to Self) */}
+          <div className="card">
+            <div className="card-content">
+              <span className="card-title">Mint Silverbacks (to Self)</span>
+              <p>
+                Deposit must be a multiple of 100. You’ll receive 1 NFT per $100 deposited.
+              </p>
+              <div className="row">
+                <div className="col s12 m6">
+                  <div className="file-field input-field">
+                    <div className="btn">
+                      <span>Front Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          if (e.target.files.length > 0) {
+                            setFrontImageFile(e.target.files[0]);
+                            log("Front image selected: " + e.target.files[0].name);
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="file-path-wrapper">
+                      <input className="file-path validate" type="text" placeholder="Upload front image" />
+                    </div>
+                  </div>
+                </div>
+                <div className="col s12 m6">
+                  <div className="file-field input-field">
+                    <div className="btn">
+                      <span>Back Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          if (e.target.files.length > 0) {
+                            setBackImageFile(e.target.files[0]);
+                            log("Back image selected: " + e.target.files[0].name);
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="file-path-wrapper">
+                      <input className="file-path validate" type="text" placeholder="Upload back image" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="row">
+                <div className="input-field col s12 m4">
+                  <input
+                    type="number"
+                    step="100"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(e.target.value)}
+                  />
+                  <label className="active">Deposit Amount</label>
+                </div>
+                <div className="col s12 m8">
+                  <button onClick={handleDeposit} className="btn waves-effect waves-light">
+                    Deposit &amp; Mint
+                    <i className="material-icons right">send</i>
+                  </button>
+                </div>
+              </div>
             </div>
-          )}
-          <div style={sectionStyle}>
-            <h2>Mint Silverbacks (to Self)</h2>
-            <p>Deposit must be a multiple of 100. You’ll receive 1 NFT per $100 deposited.</p>
-            <div style={inputGroupStyle}>
-              <input type="file" accept="image/*" onChange={handleFrontImageChange} />
-              <input type="file" accept="image/*" onChange={handleBackImageChange} />
-            </div>
-            <div style={inputGroupStyle}>
-              <input
-                type="number"
-                step="100"
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
-                style={inputStyle}
-              />
-              <button onClick={handleDeposit} style={buttonStyle}>
-                Deposit &amp; Mint
+          </div>
+
+          <br />
+
+          {/* Mint Silverback to a Specific Address */}
+          <div className="card">
+            <div className="card-content">
+              <span className="card-title">Mint Silverback to a Specific Address</span>
+              <p>
+                Deposit exactly 100 stablecoins to mint a Silverback NFT to a chosen recipient.
+              </p>
+              <div className="row">
+                <div className="input-field col s12">
+                  <input
+                    type="text"
+                    placeholder="Recipient address"
+                    value={depositRecipient}
+                    onChange={(e) => setDepositRecipient(e.target.value)}
+                  />
+                  <label className="active">Recipient Address</label>
+                </div>
+                <div className="col s12 m6">
+                  <div className="file-field input-field">
+                    <div className="btn">
+                      <span>Front Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          if (e.target.files.length > 0) {
+                            setFrontImageFile(e.target.files[0]);
+                            log("Front image selected: " + e.target.files[0].name);
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="file-path-wrapper">
+                      <input className="file-path validate" type="text" placeholder="Upload front image" />
+                    </div>
+                  </div>
+                </div>
+                <div className="col s12 m6">
+                  <div className="file-field input-field">
+                    <div className="btn">
+                      <span>Back Image</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          if (e.target.files.length > 0) {
+                            setBackImageFile(e.target.files[0]);
+                            log("Back image selected: " + e.target.files[0].name);
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="file-path-wrapper">
+                      <input className="file-path validate" type="text" placeholder="Upload back image" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <button onClick={handleDepositTo} className="btn waves-effect waves-light">
+                Deposit &amp; Mint to Recipient
+                <i className="material-icons right">send</i>
               </button>
             </div>
           </div>
-          <hr style={dividerStyle} />
-          <div style={sectionStyle}>
-            <h2>Mint Silverback to a Specific Address</h2>
-            <p>Deposit exactly 100 stablecoins to mint a Silverback NFT to a chosen recipient.</p>
-            <div style={inputGroupStyle}>
-              <input
-                type="text"
-                placeholder="Recipient address"
-                value={depositRecipient}
-                onChange={(e) => setDepositRecipient(e.target.value)}
-                style={{ ...inputStyle, width: "100%" }}
-              />
-              <input type="file" accept="image/*" onChange={handleFrontImageChange} />
-              <input type="file" accept="image/*" onChange={handleBackImageChange} />
-            </div>
-            <button onClick={handleDepositTo} style={buttonStyle}>
-              Deposit &amp; Mint to Recipient
-            </button>
-          </div>
-          <hr style={dividerStyle} />
-          <div style={sectionStyle}>
-            <h2>Batch Mint from CSV</h2>
-            <p>
-              Upload a CSV file with 3 columns: Recipient address, Front image URL, Back image URL.
-              Each row deposits $100 and mints an NFT.
-            </p>
-            <input type="file" accept=".csv" onChange={handleCSVFileChange} style={inputStyle} />
-            <button onClick={handleCSVDeposit} style={buttonStyle}>
-              Process CSV Batch Deposit
-            </button>
-          </div>
-          <hr style={dividerStyle} />
-          <div style={sectionStyle}>
-            <h2>Your Silverbacks NFTs</h2>
-            {nfts.length === 0 ? (
-              <p>No Silverbacks NFTs found.</p>
-            ) : (
-              <div style={nftGridStyle}>
-                {nfts.map((n) => (
-                  <div key={n.tokenId} style={nftCardStyle}>
-                    <p>
-                      <strong>Token ID:</strong> {n.tokenId}
-                    </p>
-                    <p>
-                      <strong>Face Value:</strong> {n.faceValue} USD
-                    </p>
-                    {n.image ? (
-                      <div>
-                        <img
-                          src={n.image.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
-                          alt="NFT Front"
-                          style={imageStyle}
-                        />
-                        {n.imageBack && (
-                          <img
-                            src={n.imageBack.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
-                            alt="NFT Back"
-                            style={{ ...imageStyle, marginTop: "0.5rem" }}
-                          />
-                        )}
-                      </div>
-                    ) : (
-                      <p>No images available.</p>
-                    )}
-                    <button onClick={() => handleBurn(n.tokenId)} style={buttonStyle}>
-                      Burn &amp; Redeem
-                    </button>
-                    <button onClick={() => handleTransfer(n.tokenId)} style={{ ...buttonStyle, marginTop: "0.5rem" }}>
-                      Transfer NFT
-                    </button>
-                  </div>
-                ))}
+
+          <br />
+
+          {/* Batch Mint from CSV */}
+          <div className="card">
+            <div className="card-content">
+              <span className="card-title">Batch Mint from CSV</span>
+              <p>
+                Upload a CSV file with 3 columns: Recipient address, Front image URL, Back image URL.
+                Each row deposits $100 and mints an NFT.
+              </p>
+              <div className="file-field input-field">
+                <div className="btn">
+                  <span>CSV File</span>
+                  <input type="file" accept=".csv" onChange={(e) => {
+                    if (e.target.files.length > 0) {
+                      setCsvFile(e.target.files[0]);
+                      log("CSV file selected: " + e.target.files[0].name);
+                    }
+                  }} />
+                </div>
+                <div className="file-path-wrapper">
+                  <input className="file-path validate" type="text" placeholder="Upload CSV" />
+                </div>
               </div>
-            )}
+              <button onClick={handleCSVDeposit} className="btn waves-effect waves-light">
+                Process CSV Batch Deposit
+                <i className="material-icons right">send</i>
+              </button>
+            </div>
+          </div>
+
+          <br />
+
+          {/* Display NFTs */}
+          <div className="card">
+            <div className="card-content">
+              <span className="card-title">Your Silverbacks NFTs</span>
+              {nfts.length === 0 ? (
+                <p>No Silverbacks NFTs found.</p>
+              ) : (
+                <div className="row">
+                  {nfts.map((n) => (
+                    <div key={n.tokenId} className="col s12 m6 l4">
+                      <div className="card">
+                        <div className="card-image">
+                          {n.image ? (
+                            <img
+                              src={n.image.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
+                              alt="NFT Front"
+                              style={{ height: "200px", objectFit: "cover" }}
+                            />
+                          ) : (
+                            <p>No image available.</p>
+                          )}
+                        </div>
+                        <div className="card-content">
+                          <p>
+                            <strong>Token ID:</strong> {n.tokenId}
+                          </p>
+                          <p>
+                            <strong>Face Value:</strong> {n.faceValue} USD
+                          </p>
+                        </div>
+                        <div className="card-action">
+                          <button onClick={() => handleBurn(n.tokenId)} className="btn red lighten-1">
+                            Burn &amp; Redeem
+                          </button>
+                          <button onClick={() => handleTransfer(n.tokenId)} className="btn blue lighten-1" style={{ marginLeft: "0.5rem" }}>
+                            Transfer NFT
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </>
       ) : (
-        <p>Please connect your wallet using the header.</p>
+        <div className="card-panel red lighten-4">
+          <p>Please connect your wallet using the header.</p>
+        </div>
       )}
-      <div style={debugLogStyle}>
-        <h3>Debug Log</h3>
+
+      {/* Debug Log */}
+      <div className="card-panel grey darken-3" style={{ marginTop: "2rem", color: "white" }}>
+        <h5>Debug Log</h5>
         {logMessages.map((msg, idx) => (
-          <p key={idx} style={{ fontFamily: "monospace", margin: 0 }}>{msg}</p>
+          <p key={idx} style={{ fontFamily: "monospace", margin: "0.2rem 0" }}>
+            {msg}
+          </p>
         ))}
       </div>
     </div>
   );
 };
-
-// Styles
-const pageContainerStyle = {
-  padding: "2rem",
-  backgroundColor: "#fff",
-  borderRadius: "8px",
-  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-  margin: "2rem auto",
-  maxWidth: "900px"
-};
-const infoContainerStyle = {
-  marginBottom: "1rem",
-  padding: "1rem",
-  backgroundColor: "#e9ecef",
-  borderRadius: "8px"
-};
-const sectionStyle = { marginBottom: "1.5rem" };
-const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "1rem" };
-const inputStyle = { padding: "0.5rem", fontSize: "1rem" };
-const buttonStyle = { padding: "0.5rem 1rem", backgroundColor: "#4CAF50", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "1rem" };
-const dividerStyle = { margin: "1.5rem 0", border: "none", borderTop: "1px solid #ddd" };
-const nftGridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginTop: "1rem" };
-const nftCardStyle = { padding: "1rem", border: "1px solid #ddd", borderRadius: "8px", backgroundColor: "#f9f9f9", textAlign: "center" };
-const imageStyle = { width: "100%", borderRadius: "4px" };
-const debugLogStyle = { marginTop: "2rem", backgroundColor: "#333", color: "#fff", padding: "1rem", borderRadius: "4px", maxHeight: "200px", overflowY: "auto" };
 
 export default AdminPage;

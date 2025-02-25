@@ -1,10 +1,8 @@
 import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ethers } from "ethers";
 import ChainSelector from "./ChainSelector";
 
 const Header = ({ currentAccount, setCurrentAccount }) => {
-  // On mount, read stored account from localStorage.
   useEffect(() => {
     const storedAccount = localStorage.getItem("currentAccount");
     if (storedAccount) {
@@ -33,70 +31,42 @@ const Header = ({ currentAccount, setCurrentAccount }) => {
   };
 
   return (
-    <header style={headerStyle}>
-      <div style={headerLeftStyle}>
-        <Link to="/" style={navLinkStyle}>Redemption</Link>
-        <Link to="/admin" style={navLinkStyle}>Admin</Link>
+    <nav className="blue darken-3">
+      <div
+        className="nav-wrapper container"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        {/* Left Section: Logo */}
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <Link to="/" className="brand-logo" style={{ marginRight: "20px" }}>
+            Silverbacks
+          </Link>
+        </div>
+
+        {/* Center Section: Chain Selector */}
+        <div style={{ flex: 1, textAlign: "center" }}>
+          <ChainSelector />
+        </div>
+
+        {/* Right Section: Wallet Connect/Disconnect */}
+        <div>
+          {currentAccount ? (
+            <button onClick={disconnectWallet} className="btn waves-effect waves-light">
+              Disconnect
+            </button>
+          ) : (
+            <button onClick={connectWallet} className="btn waves-effect waves-light">
+              Connect Wallet
+            </button>
+          )}
+        </div>
       </div>
-      <div style={headerCenterStyle}>
-        <ChainSelector />
-      </div>
-      <div style={headerRightStyle}>
-        {currentAccount ? (
-          <button onClick={disconnectWallet} style={buttonStyle}>
-            Disconnect
-          </button>
-        ) : (
-          <button onClick={connectWallet} style={buttonStyle}>
-            Connect Wallet
-          </button>
-        )}
-      </div>
-    </header>
+    </nav>
   );
-};
-
-const headerStyle = {
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  padding: "1rem 2rem",
-  backgroundColor: "#222",
-  color: "#fff"
-};
-
-const headerLeftStyle = {
-  flex: "1",
-  display: "flex",
-  alignItems: "center"
-};
-
-const headerCenterStyle = {
-  flex: "1",
-  display: "flex",
-  justifyContent: "center"
-};
-
-const headerRightStyle = {
-  flex: "1",
-  display: "flex",
-  justifyContent: "flex-end"
-};
-
-const navLinkStyle = {
-  color: "#fff",
-  textDecoration: "none",
-  marginRight: "1rem",
-  fontSize: "1.1rem"
-};
-
-const buttonStyle = {
-  padding: "0.5rem 1rem",
-  backgroundColor: "#4CAF50",
-  color: "#fff",
-  border: "none",
-  borderRadius: "4px",
-  cursor: "pointer"
 };
 
 export default Header;

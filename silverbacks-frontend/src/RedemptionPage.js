@@ -2,18 +2,17 @@ import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
 import chains from "./chains.json";
+import NFTCard from "./NFTCard";
 
 // Minimal ABI snippets:
-const stableCoinABI = [
-  "function balanceOf(address) view returns (uint256)"
-];
+const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
 const nftABI = [
   "function balanceOf(address) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   "function faceValue(uint256 tokenId) view returns (uint256)",
-  "function tokenURI(uint256 tokenId) view returns (string)"
+  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function safeTransferFrom(address from, address to, uint256 tokenId)" // <-- Added function signature
 ];
-// Updated vault ABI now includes the redeem() function for direct claims.
 const vaultABI = [
   "function redeem(uint256 tokenId) external",
   "function redeemWithAuth(uint256 tokenId, bytes signature) external",
@@ -25,14 +24,9 @@ const RedemptionPage = ({ currentAccount }) => {
   const [searchParams] = useSearchParams();
   const pk = searchParams.get("pk") || "";
   const urlAddress = searchParams.get("address") || "";
-
-  // For redemption NFTs (from URL parameter)
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNfts] = useState([]);
-
-  // For connected wallet NFTs
   const [myNfts, setMyNFTs] = useState([]);
-
   const [logMessages, setLogMessages] = useState([]);
   const [contractAddresses, setContractAddresses] = useState(null);
   const [erc20Balance, setErc20Balance] = useState(null);
@@ -42,7 +36,6 @@ const RedemptionPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // Set ownerAddress from URL parameters.
   useEffect(() => {
     if (pk && ethers.utils.isHexString(pk, 32)) {
       try {
@@ -60,7 +53,6 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [pk, urlAddress]);
 
-  // Load contract addresses dynamically.
   useEffect(() => {
     async function loadContractAddresses() {
       if (window.ethereum) {
@@ -82,12 +74,15 @@ const RedemptionPage = ({ currentAccount }) => {
     loadContractAddresses();
   }, []);
 
-  // Load ERC20 balance of the connected wallet.
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
+      const stableCoinContract = new ethers.Contract(
+        contractAddresses.stableCoin,
+        stableCoinABI,
+        provider
+      );
       const balance = await stableCoinContract.balanceOf(currentAccount);
       setErc20Balance(ethers.utils.formatEther(balance));
       log("ERC20 balance of connected wallet: " + ethers.utils.formatEther(balance));
@@ -102,12 +97,15 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // Load NFTs for redemption (using ownerAddress from URL)
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !window.ethereum || !contractAddresses) return;
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
+      const nftContract = new ethers.Contract(
+        contractAddresses.silverbacksNFT,
+        nftABI,
+        provider
+      );
       const count = await nftContract.balanceOf(ownerAddress);
       const nftData = [];
       for (let i = 0; i < count.toNumber(); i++) {
@@ -117,7 +115,9 @@ const RedemptionPage = ({ currentAccount }) => {
         log(`Redeem Section - Token ID ${tokenId} metadata URI: ${tokenURI}`);
         let metadata = {};
         try {
-          const response = await fetch("https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7));
+          const response = await fetch(
+            "https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7)
+          );
           metadata = await response.json();
         } catch (err) {
           log("Error fetching metadata for token " + tokenId + ": " + err.message);
@@ -129,7 +129,7 @@ const RedemptionPage = ({ currentAccount }) => {
           image: metadata.image || null,
           imageBack: metadata.properties ? metadata.properties.imageBack : null,
           name: metadata.name || "",
-          description: metadata.description || ""
+          description: metadata.description || "",
         });
       }
       setRedeemNfts(nftData);
@@ -147,12 +147,15 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [ownerAddress, contractAddresses]);
 
-  // Load NFTs for the connected wallet.
   const loadMyNFTs = async () => {
     if (!currentAccount || !window.ethereum || !contractAddresses) return;
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
+      const nftContract = new ethers.Contract(
+        contractAddresses.silverbacksNFT,
+        nftABI,
+        provider
+      );
       const count = await nftContract.balanceOf(currentAccount);
       const nftData = [];
       for (let i = 0; i < count.toNumber(); i++) {
@@ -162,7 +165,9 @@ const RedemptionPage = ({ currentAccount }) => {
         log(`My Wallet - Token ID ${tokenId} metadata URI: ${tokenURI}`);
         let metadata = {};
         try {
-          const response = await fetch("https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7));
+          const response = await fetch(
+            "https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7)
+          );
           metadata = await response.json();
         } catch (err) {
           log("Error fetching metadata for token " + tokenId + ": " + err.message);
@@ -174,7 +179,7 @@ const RedemptionPage = ({ currentAccount }) => {
           image: metadata.image || null,
           imageBack: metadata.properties ? metadata.properties.imageBack : null,
           name: metadata.name || "",
-          description: metadata.description || ""
+          description: metadata.description || "",
         });
       }
       setMyNFTs(nftData);
@@ -192,7 +197,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // Redeem functions for NFTs that require a signature (for addresses provided via URL)
+  // Redeem functions (unchanged)
   const handleRedeemTo = async (tokenId) => {
     if (!currentAccount) {
       alert("Please connect your wallet using the header.");
@@ -249,7 +254,6 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // NEW FUNCTION: Allow connected wallet NFT owners to redeem (burn) their NFT and claim the attached stablecoins.
   const handleRedeem = async (tokenId) => {
     if (!currentAccount) {
       alert("Please connect your wallet using the header.");
@@ -263,7 +267,6 @@ const RedemptionPage = ({ currentAccount }) => {
       const tx = await vaultContract.redeem(tokenId);
       await tx.wait();
       log("Redeem transaction confirmed for tokenId " + tokenId);
-      // Refresh NFT data and ERC20 balance
       loadMyNFTs();
       loadERC20Balance();
     } catch (error) {
@@ -271,7 +274,6 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // NEW FUNCTION: Allow sending (transferring) an NFT from the connected wallet.
   const handleSendNFT = async (tokenId) => {
     if (!currentAccount) {
       alert("Please connect your wallet using the header.");
@@ -296,11 +298,25 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
+  useEffect(() => {
+    if (window.ethereum) {
+      window.ethereum.on("accountsChanged", (accounts) => {
+        if (accounts.length > 0) {
+          log("Account changed to: " + accounts[0]);
+        }
+      });
+      window.ethereum.on("chainChanged", (_chainId) => {
+        log("Chain changed to: " + _chainId);
+        window.location.reload();
+      });
+    }
+  }, []);
+
   return (
-    <div style={pageContainerStyle}>
-      <h1>Redemption Page</h1>
+    <div className="container">
+      <h1 className="center-align">Redemption Page</h1>
       {contractAddresses && (
-        <div style={infoContainerStyle}>
+        <div className="card-panel teal lighten-4">
           <p>
             <strong>ERC20 Token Address:</strong> {contractAddresses.stableCoin}
           </p>
@@ -315,166 +331,69 @@ const RedemptionPage = ({ currentAccount }) => {
         </div>
       )}
 
-      {/* Section for Redeeming NFTs (from URL ownerAddress) */}
+      {/* Section for Redeeming NFTs (based on URL ownerAddress) */}
       {ownerAddress && (
-        <div style={{ marginBottom: "2rem" }}>
-          <h2>Redeeming NFTs for Address: {ownerAddress}</h2>
-          {redeemNfts.length > 0 ? (
-            <div style={nftGridStyle}>
-              {redeemNfts.map((n) => (
-                <div key={n.tokenId} style={nftCardStyle}>
-                  <p>
-                    <strong>Token ID:</strong> {n.tokenId}
-                  </p>
-                  <p>
-                    <strong>Face Value:</strong> {n.faceValue} USD
-                  </p>
-                  {n.image ? (
-                    <div>
-                      <img
-                        src={n.image.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
-                        alt="NFT Front"
-                        style={imageStyle}
-                      />
-                      {n.imageBack && (
-                        <img
-                          src={n.imageBack.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
-                          alt="NFT Back"
-                          style={{ ...imageStyle, marginTop: "0.5rem" }}
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <p>No images available.</p>
-                  )}
-                  {(pk && ethers.utils.isHexString(pk, 32)) ? (
-                    <>
-                      <button onClick={() => handleRedeemTo(n.tokenId)} style={actionButtonStyle}>
-                        Redeem for Stablecoin
-                      </button>
-                      <button onClick={() => handleClaimNFT(n.tokenId)} style={{ ...actionButtonStyle, marginTop: "0.5rem" }}>
-                        Claim NFT
-                      </button>
-                    </>
-                  ) : (
-                    <p style={{ fontStyle: "italic", color: "gray" }}>
-                      Private key not provided. Redemption disabled.
-                    </p>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p>No redeemable NFTs found for address {ownerAddress}</p>
-          )}
+        <div className="card">
+          <div className="card-content">
+            <span className="card-title">Redeeming NFTs for Address: {ownerAddress}</span>
+            {redeemNfts.length > 0 ? (
+              <div className="row">
+                {redeemNfts.map((n) => (
+                  <NFTCard
+                    key={n.tokenId}
+                    nft={n}
+                    pk={pk}
+                    handleRedeemTo={handleRedeemTo}
+                    handleClaimNFT={handleClaimNFT}
+                    handleRedeem={handleRedeem}
+                    handleSendNFT={handleSendNFT}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p>No redeemable NFTs found for address {ownerAddress}</p>
+            )}
+          </div>
         </div>
       )}
 
       {/* Section for Connected Wallet's NFTs */}
       {currentAccount && (
-        <div style={{ marginBottom: "2rem" }}>
-          <h2>Your Connected Wallet NFTs</h2>
-          {myNfts.length > 0 ? (
-            <div style={nftGridStyle}>
-              {myNfts.map((n) => (
-                <div key={n.tokenId} style={nftCardStyle}>
-                  <p>
-                    <strong>Token ID:</strong> {n.tokenId}
-                  </p>
-                  <p>
-                    <strong>Face Value:</strong> {n.faceValue} USD
-                  </p>
-                  {n.image ? (
-                    <div>
-                      <img
-                        src={n.image.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
-                        alt="NFT Front"
-                        style={imageStyle}
-                      />
-                      {n.imageBack && (
-                        <img
-                          src={n.imageBack.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
-                          alt="NFT Back"
-                          style={{ ...imageStyle, marginTop: "0.5rem" }}
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <p>No images available.</p>
-                  )}
-                  <button onClick={() => handleRedeem(n.tokenId)} style={actionButtonStyle}>
-                    Redeem NFT
-                  </button>
-                  <button onClick={() => handleSendNFT(n.tokenId)} style={{ ...actionButtonStyle, marginTop: "0.5rem" }}>
-                    Send NFT
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p>No NFTs found in your connected wallet ({currentAccount})</p>
-          )}
+        <div className="card">
+          <div className="card-content">
+            <span className="card-title">Your Connected Wallet NFTs</span>
+            {myNfts.length > 0 ? (
+              <div className="row">
+                {myNfts.map((n) => (
+                  <NFTCard
+                    key={n.tokenId}
+                    nft={n}
+                    pk={""} // For connected wallet NFTs, redemption buttons can be shown or hidden as desired.
+                    handleRedeemTo={handleRedeemTo}
+                    handleClaimNFT={handleClaimNFT}
+                    handleRedeem={handleRedeem}
+                    handleSendNFT={handleSendNFT}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p>No NFTs found in your connected wallet ({currentAccount})</p>
+            )}
+          </div>
         </div>
       )}
 
-      <div style={debugLogStyle}>
-        <h3>Debug Log</h3>
+      {/* Debug Log */}
+      <div className="card-panel grey darken-3" style={{ color: "white", marginTop: "2rem" }}>
+        <h5>Debug Log</h5>
         {logMessages.map((msg, idx) => (
-          <p key={idx} style={{ fontFamily: "monospace", margin: 0 }}>
+          <p key={idx} style={{ fontFamily: "monospace", margin: "0.2rem 0" }}>
             {msg}
           </p>
         ))}
       </div>
     </div>
   );
-};
-
-// Styles
-const pageContainerStyle = {
-  padding: "2rem",
-  backgroundColor: "#fff",
-  borderRadius: "8px",
-  boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
-  margin: "2rem auto",
-  maxWidth: "900px"
-};
-const infoContainerStyle = {
-  marginBottom: "1rem",
-  padding: "1rem",
-  backgroundColor: "#e9ecef",
-  borderRadius: "8px"
-};
-const nftGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "1rem",
-  marginTop: "1rem"
-};
-const nftCardStyle = {
-  padding: "1rem",
-  border: "1px solid #ddd",
-  borderRadius: "8px",
-  backgroundColor: "#f9f9f9",
-  textAlign: "center"
-};
-const imageStyle = { width: "100%", borderRadius: "4px" };
-const actionButtonStyle = {
-  padding: "0.5rem 1rem",
-  marginTop: "0.5rem",
-  backgroundColor: "#4CAF50",
-  color: "#fff",
-  border: "none",
-  borderRadius: "4px",
-  cursor: "pointer"
-};
-const debugLogStyle = {
-  marginTop: "2rem",
-  backgroundColor: "#333",
-  color: "#fff",
-  padding: "1rem",
-  borderRadius: "4px",
-  maxHeight: "200px",
-  overflowY: "auto"
 };
 
 export default RedemptionPage;

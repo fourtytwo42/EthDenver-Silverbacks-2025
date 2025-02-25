@@ -1,12 +1,13 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ethers } from "ethers";
 import chains from "./chains.json";
 
 const ChainSelector = () => {
   const [currentChain, setCurrentChain] = useState("");
   const [isSupported, setIsSupported] = useState(true);
+  const dropdownTriggerRef = useRef(null);
 
-  // Fetch the current chain from MetaMask and update state.
+  // Fetch the current network chainId from MetaMask.
   const fetchCurrentChain = async () => {
     if (window.ethereum) {
       try {
@@ -23,7 +24,6 @@ const ChainSelector = () => {
 
   useEffect(() => {
     fetchCurrentChain();
-    // Listen for chain changes.
     if (window.ethereum) {
       const handleChainChanged = (chainId) => {
         setCurrentChain(chainId);
@@ -38,7 +38,7 @@ const ChainSelector = () => {
     }
   }, []);
 
-  // Attempt to switch the network.
+  // Attempt to switch to the selected network.
   const switchNetwork = async (targetChainId) => {
     if (!window.ethereum) return;
     try {
@@ -48,7 +48,7 @@ const ChainSelector = () => {
       });
       fetchCurrentChain();
     } catch (switchError) {
-      // If the chain is not added to MetaMask, attempt to add it.
+      // If the network is not added, prompt MetaMask to add it.
       if (switchError.code === 4902) {
         const chainData = chains[targetChainId];
         if (!chainData) {
@@ -71,28 +71,63 @@ const ChainSelector = () => {
     }
   };
 
-  // When the user selects a different network, immediately trigger the switch.
-  const handleChainChange = async (e) => {
-    const newChain = e.target.value;
-    if (newChain !== currentChain) {
-      await switchNetwork(newChain);
-    }
+  // Handle chain selection.
+  const handleSelectChain = async (chainId) => {
+    await switchNetwork(chainId);
   };
 
+  // Initialize Materialize dropdown with our container option.
+  useEffect(() => {
+    if (window.M && dropdownTriggerRef.current) {
+      window.M.Dropdown.init(dropdownTriggerRef.current, {
+        coverTrigger: false,
+        constrainWidth: false,
+        // Append the dropdown to our container so its positioning is relative to it
+        container: document.querySelector(".chain-selector-container"),
+      });
+    }
+  }, []);
+
   return (
-    <div style={{ display: "flex", alignItems: "center" }}>
-      <p style={{ margin: 0, fontSize: "0.9rem", marginRight: "0.5rem" }}>
+    <div
+      className="chain-selector-container"
+      style={{
+        width: "100%",
+        position: "relative",
+        textAlign: "center",
+      }}
+    >
+      <button
+        ref={dropdownTriggerRef}
+        className="btn dropdown-trigger"
+        data-target="chainDropdown"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minWidth: "200px",
+        }}
+      >
         {isSupported
-          ? `${chains[currentChain]?.chainName || "Unknown"} (${currentChain})`
-          : `Unsupported network (${currentChain})`}
-      </p>
-      <select value={currentChain} onChange={handleChainChange}>
+          ? (chains[currentChain]?.chainName || "Unknown")
+          : "Unsupported Network"}
+        <i className="material-icons" style={{ marginLeft: "0.5rem" }}>
+          arrow_drop_down
+        </i>
+      </button>
+      <ul
+        id="chainDropdown"
+        className="dropdown-content"
+        style={{ marginTop: "10px" }}
+      >
         {Object.keys(chains).map((chainId) => (
-          <option key={chainId} value={chainId}>
-            {chains[chainId].chainName} ({chainId})
-          </option>
+          <li key={chainId} className={chainId === currentChain ? "active" : ""}>
+            <a href="#!" onClick={() => handleSelectChain(chainId)}>
+              {chains[chainId].chainName}
+            </a>
+          </li>
         ))}
-      </select>
+      </ul>
     </div>
   );
 };
