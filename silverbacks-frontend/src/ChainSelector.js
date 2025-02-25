@@ -7,13 +7,12 @@ const ChainSelector = () => {
   const [supported, setSupported] = useState(true);
   const [selectedChainId, setSelectedChainId] = useState("");
 
-  // Function to get current chain from provider
+  // Fetch the current chain from MetaMask
   const fetchCurrentChain = async () => {
     if (window.ethereum) {
       try {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const network = await provider.getNetwork();
-        // Convert numeric chainId to hex (with "0x" prefix) in lower case
         const chainIdHex = "0x" + network.chainId.toString(16);
         setCurrentChain(chainIdHex);
         setSupported(!!chains[chainIdHex]);
@@ -25,8 +24,6 @@ const ChainSelector = () => {
 
   useEffect(() => {
     fetchCurrentChain();
-
-    // Listen for network changes:
     if (window.ethereum) {
       window.ethereum.on("chainChanged", (chainId) => {
         setCurrentChain(chainId);
@@ -35,7 +32,7 @@ const ChainSelector = () => {
     }
   }, []);
 
-  // Function to switch network
+  // Switch network using MetaMask
   const switchNetwork = async (targetChainId) => {
     try {
       await window.ethereum.request({
@@ -43,18 +40,19 @@ const ChainSelector = () => {
         params: [{ chainId: targetChainId }]
       });
     } catch (switchError) {
-      // If the chain is not added, error code 4902 is returned.
+      // Error code 4902 indicates the chain hasn't been added.
       if (switchError.code === 4902) {
-        // Get full chain parameters from our JSON
-        const chainParams = chains[targetChainId];
-        if (!chainParams) {
+        const chainData = chains[targetChainId];
+        if (!chainData) {
           alert("Chain parameters not found. Please select a supported chain.");
           return;
         }
+        // Remove unsupported keys (like "contracts") from the parameters.
+        const { contracts, ...paramsWithoutContracts } = chainData;
         try {
           await window.ethereum.request({
             method: "wallet_addEthereumChain",
-            params: [chainParams]
+            params: [paramsWithoutContracts]
           });
         } catch (addError) {
           console.error("Error adding chain:", addError);
@@ -73,7 +71,6 @@ const ChainSelector = () => {
   const handleSwitchClick = async () => {
     if (selectedChainId) {
       await switchNetwork(selectedChainId);
-      // Refresh current network info after switching
       fetchCurrentChain();
     }
   };

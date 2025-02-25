@@ -11,7 +11,7 @@ function App() {
         <Link to="/" style={{ marginRight: "1rem" }}>Redemption</Link>
         <Link to="/admin">Admin</Link>
       </nav>
-      {/* Display chain selection and network info */}
+      {/* Display the network selector */}
       <ChainSelector />
       <Routes>
         <Route path="/" element={<RedemptionPage />} />
