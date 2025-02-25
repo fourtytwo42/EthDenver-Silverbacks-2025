@@ -18,7 +18,7 @@ contract SilverbacksNFT is ERC721Enumerable, Ownable {
     // Base URI fallback (if no per-token metadata is set).
     string private _baseTokenURI;
 
-    // The vault (main contract) can mint and burn tokens.
+    // The vault (main contract) can mint, burn, and claim tokens.
     address public vaultContract;
 
     event MintedSilverback(uint256 indexed tokenId, address indexed owner, uint256 value);
@@ -102,8 +102,7 @@ contract SilverbacksNFT is ERC721Enumerable, Ownable {
         emit BurnedSilverback(tokenId, msg.sender);
     }
 
-    // --- The following functions are required overrides for ERC721Enumerable ---
-
+    // --- Required overrides for ERC721Enumerable ---
     function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
         internal
         override(ERC721Enumerable)
@@ -118,5 +117,20 @@ contract SilverbacksNFT is ERC721Enumerable, Ownable {
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
+    }
+
+    // --- New functionality for claim operations ---
+    modifier onlyVault() {
+        require(msg.sender == vaultContract, "Not authorized: Only vault");
+        _;
+    }
+
+    /**
+     * claimTransfer:
+     * Called only by the vault contract, this safely transfers an NFT from the current owner
+     * to the new owner without requiring the owner to set approval.
+     */
+    function claimTransfer(address from, address to, uint256 tokenId) external onlyVault {
+        _safeTransfer(from, to, tokenId, "");
     }
 }
