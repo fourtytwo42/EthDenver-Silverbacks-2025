@@ -7,7 +7,6 @@ const ChainSelector = () => {
   const [supported, setSupported] = useState(true);
   const [selectedChainId, setSelectedChainId] = useState("");
 
-  // Fetch the current chain from MetaMask
   const fetchCurrentChain = async () => {
     if (window.ethereum) {
       try {
@@ -32,7 +31,6 @@ const ChainSelector = () => {
     }
   }, []);
 
-  // Switch network using MetaMask
   const switchNetwork = async (targetChainId) => {
     try {
       await window.ethereum.request({
@@ -40,14 +38,12 @@ const ChainSelector = () => {
         params: [{ chainId: targetChainId }]
       });
     } catch (switchError) {
-      // Error code 4902 indicates the chain hasn't been added.
       if (switchError.code === 4902) {
         const chainData = chains[targetChainId];
         if (!chainData) {
           alert("Chain parameters not found. Please select a supported chain.");
           return;
         }
-        // Remove unsupported keys (like "contracts") from the parameters.
         const { contracts, ...paramsWithoutContracts } = chainData;
         try {
           await window.ethereum.request({
@@ -76,25 +72,17 @@ const ChainSelector = () => {
   };
 
   return (
-    <div style={{ padding: "1rem", borderBottom: "1px solid #ccc" }}>
+    <div style={{ display: "flex", alignItems: "center" }}>
       {currentChain ? (
         <>
-          <p>
-            <strong>Connected Network:</strong> {currentChain}{" "}
-            {supported ? (
-              <>({chains[currentChain].chainName})</>
-            ) : (
-              <span style={{ color: "red" }}>
-                (Unsupported – please switch to one of the supported chains below)
-              </span>
-            )}
+          <p style={{ margin: 0, fontSize: "0.9rem" }}>
+            {supported
+              ? `${chains[currentChain].chainName} (${currentChain})`
+              : `Unsupported network (${currentChain})`}
           </p>
           {!supported && (
-            <div>
-              <label htmlFor="chainSelect">
-                Select a supported network:
-              </label>
-              <select id="chainSelect" onChange={handleSelectChange} defaultValue="">
+            <div style={{ marginLeft: "1rem" }}>
+              <select onChange={handleSelectChange} defaultValue="">
                 <option value="" disabled>
                   -- Select Network --
                 </option>
@@ -104,8 +92,8 @@ const ChainSelector = () => {
                   </option>
                 ))}
               </select>
-              <button onClick={handleSwitchClick} style={{ marginLeft: "1rem" }}>
-                Switch Network
+              <button onClick={handleSwitchClick} style={{ marginLeft: "0.5rem" }}>
+                Switch
               </button>
             </div>
           )}

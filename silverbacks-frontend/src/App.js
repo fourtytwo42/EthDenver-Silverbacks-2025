@@ -1,24 +1,29 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import React, { useState } from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import RedemptionPage from "./RedemptionPage";
 import AdminPage from "./AdminPage";
-import ChainSelector from "./ChainSelector";
+import Header from "./Header";
 
 function App() {
+  const [currentAccount, setCurrentAccount] = useState(null);
+
   return (
     <Router>
-      <nav style={{ padding: "1rem", backgroundColor: "#eee" }}>
-        <Link to="/" style={{ marginRight: "1rem" }}>Redemption</Link>
-        <Link to="/admin">Admin</Link>
-      </nav>
-      {/* Display the network selector */}
-      <ChainSelector />
-      <Routes>
-        <Route path="/" element={<RedemptionPage />} />
-        <Route path="/admin" element={<AdminPage />} />
-      </Routes>
+      <Header currentAccount={currentAccount} setCurrentAccount={setCurrentAccount} />
+      <div style={mainContainerStyle}>
+        <Routes>
+          <Route path="/" element={<RedemptionPage currentAccount={currentAccount} />} />
+          <Route path="/admin" element={<AdminPage currentAccount={currentAccount} />} />
+        </Routes>
+      </div>
     </Router>
   );
 }
+
+const mainContainerStyle = {
+  padding: "2rem",
+  backgroundColor: "#f9f9f9",
+  minHeight: "calc(100vh - 80px)" // Adjust according to header height
+};
 
 export default App;
