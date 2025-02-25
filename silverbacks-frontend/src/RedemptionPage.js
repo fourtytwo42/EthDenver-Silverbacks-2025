@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
+import chains from "./chains.json";
 
-const silverbacksNftAddress = "0xEb641123243b897201B7E1fB2052256B6E9e1f5a";
-const vaultAddress = "0x2A314860Cc789D30E384369769e2C85b67939689";
-
+// Minimal ABI snippets:
 const nftABI = [
   "function balanceOf(address) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
@@ -24,11 +23,34 @@ const RedemptionPage = ({ currentAccount }) => {
   const [ownerAddress, setOwnerAddress] = useState("");
   const [nfts, setNfts] = useState([]);
   const [logMessages, setLogMessages] = useState([]);
+  const [contractAddresses, setContractAddresses] = useState(null);
 
   const log = (msg) => {
     console.log(msg);
     setLogMessages((prev) => [...prev, msg]);
   };
+
+  // Load contract addresses dynamically
+  useEffect(() => {
+    async function loadContractAddresses() {
+      if (window.ethereum) {
+        try {
+          const provider = new ethers.providers.Web3Provider(window.ethereum);
+          const network = await provider.getNetwork();
+          const chainIdHex = "0x" + network.chainId.toString(16);
+          if (chains[chainIdHex] && chains[chainIdHex].contracts) {
+            setContractAddresses(chains[chainIdHex].contracts);
+            log("Loaded contract addresses for chain " + chainIdHex);
+          } else {
+            log("Contracts not defined for chain " + chainIdHex);
+          }
+        } catch (error) {
+          log("Error loading contract addresses: " + error.message);
+        }
+      }
+    }
+    loadContractAddresses();
+  }, []);
 
   // Create off–chain wallet instance from provided private key.
   useEffect(() => {
@@ -46,9 +68,9 @@ const RedemptionPage = ({ currentAccount }) => {
   }, [pk]);
 
   const loadNFTs = async () => {
-    if (!ownerAddress || !window.ethereum) return;
+    if (!ownerAddress || !window.ethereum || !contractAddresses) return;
     const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const nftContract = new ethers.Contract(silverbacksNftAddress, nftABI, provider);
+    const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
     try {
       const count = await nftContract.balanceOf(ownerAddress);
       const nftData = [];
@@ -100,7 +122,7 @@ const RedemptionPage = ({ currentAccount }) => {
       log("Signature for redeeming tokenId " + tokenId + ": " + signature);
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
       const tx = await vaultContract.redeemTo(tokenId, signature);
       log("RedeemTo transaction submitted for tokenId " + tokenId);
       await tx.wait();
@@ -128,7 +150,7 @@ const RedemptionPage = ({ currentAccount }) => {
       log("Signature for claiming tokenId " + tokenId + ": " + signature);
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
       const tx = await vaultContract.claimNFT(tokenId, signature);
       log("ClaimNFT transaction submitted for tokenId " + tokenId);
       await tx.wait();
@@ -140,10 +162,10 @@ const RedemptionPage = ({ currentAccount }) => {
   };
 
   useEffect(() => {
-    if (ownerAddress) {
+    if (ownerAddress && contractAddresses) {
       loadNFTs();
     }
-  }, [ownerAddress]);
+  }, [ownerAddress, contractAddresses]);
 
   return (
     <div style={pageContainerStyle}>
@@ -199,6 +221,7 @@ const RedemptionPage = ({ currentAccount }) => {
   );
 };
 
+// Styles
 const pageContainerStyle = {
   padding: "2rem",
   backgroundColor: "#fff",
@@ -223,29 +246,8 @@ const nftCardStyle = {
   textAlign: "center"
 };
 
-const imageStyle = {
-  width: "100%",
-  borderRadius: "4px"
-};
-
-const actionButtonStyle = {
-  padding: "0.5rem 1rem",
-  marginTop: "0.5rem",
-  backgroundColor: "#4CAF50",
-  color: "#fff",
-  border: "none",
-  borderRadius: "4px",
-  cursor: "pointer"
-};
-
-const debugLogStyle = {
-  marginTop: "2rem",
-  backgroundColor: "#333",
-  color: "#fff",
-  padding: "1rem",
-  borderRadius: "4px",
-  maxHeight: "200px",
-  overflowY: "auto"
-};
+const imageStyle = { width: "100%", borderRadius: "4px" };
+const actionButtonStyle = { padding: "0.5rem 1rem", marginTop: "0.5rem", backgroundColor: "#4CAF50", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer" };
+const debugLogStyle = { marginTop: "2rem", backgroundColor: "#333", color: "#fff", padding: "1rem", borderRadius: "4px", maxHeight: "200px", overflowY: "auto" };
 
 export default RedemptionPage;

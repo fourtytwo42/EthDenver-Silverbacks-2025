@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { create } from "ipfs-http-client";
-
-// Replace with your deployed contract addresses:
-const stableCoinAddress = "0xfED1D0836004e47a30C93aa5E3eD7735B977a2eb";
-const silverbacksNftAddress = "0xEb641123243b897201B7E1fB2052256B6E9e1f5a";
-const vaultAddress = "0x2A314860Cc789D30E384369769e2C85b67939689";
+import chains from "./chains.json";
 
 // Minimal ABI snippets:
 const stableCoinABI = [
@@ -46,22 +42,44 @@ const AdminPage = ({ currentAccount }) => {
   const [csvFile, setCsvFile] = useState(null);
   const [nfts, setNfts] = useState([]);
   const [logMessages, setLogMessages] = useState([]);
+  const [contractAddresses, setContractAddresses] = useState(null);
 
   const log = (msg) => {
     console.log(msg);
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // Function to load admin data (including NFT data)
+  // Load contract addresses from chains.json based on current network
+  useEffect(() => {
+    async function loadContractAddresses() {
+      if (window.ethereum) {
+        try {
+          const provider = new ethers.providers.Web3Provider(window.ethereum);
+          const network = await provider.getNetwork();
+          const chainIdHex = "0x" + network.chainId.toString(16);
+          if (chains[chainIdHex] && chains[chainIdHex].contracts) {
+            setContractAddresses(chains[chainIdHex].contracts);
+            log("Loaded contract addresses for chain " + chainIdHex);
+          } else {
+            log("Contracts not defined for chain " + chainIdHex);
+          }
+        } catch (error) {
+          log("Error loading contract addresses: " + error.message);
+        }
+      }
+    }
+    loadContractAddresses();
+  }, []);
+
+  // Function to load admin NFT data
   const loadData = async () => {
-    if (!currentAccount || !window.ethereum) return;
+    if (!currentAccount || !window.ethereum || !contractAddresses) return;
     const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const stableCoinContract = new ethers.Contract(stableCoinAddress, stableCoinABI, provider);
-    const nftContract = new ethers.Contract(silverbacksNftAddress, nftABI, provider);
+    const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
+    const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
     try {
       const bal = await stableCoinContract.balanceOf(currentAccount);
       log("StableCoin balance (raw) = " + bal.toString());
-      // (You can use this balance for admin statistics as needed)
       const nftCount = await nftContract.balanceOf(currentAccount);
       log("You own " + nftCount.toNumber() + " Silverbacks NFTs.");
       const nftData = [];
@@ -72,9 +90,7 @@ const AdminPage = ({ currentAccount }) => {
         log(`Token ID ${tokenId} metadata URI: ${tokenURI}`);
         let metadata = {};
         try {
-          const response = await fetch(
-            "https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7)
-          );
+          const response = await fetch("https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7));
           metadata = await response.json();
         } catch (err) {
           log("Error fetching metadata for token " + tokenId + ": " + err.message);
@@ -95,14 +111,13 @@ const AdminPage = ({ currentAccount }) => {
   };
 
   useEffect(() => {
-    if (currentAccount) {
+    if (currentAccount && contractAddresses) {
       loadData();
     }
-  }, [currentAccount]);
+  }, [currentAccount, contractAddresses]);
 
   // HANDLERS
 
-  // Deposit (mint to self)
   const handleDeposit = async () => {
     if (!frontImageFile || !backImageFile) {
       alert("Please select both front and back images.");
@@ -136,10 +151,10 @@ const AdminPage = ({ currentAccount }) => {
 
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const stableCoinContract = new ethers.Contract(stableCoinAddress, stableCoinABI, signer);
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
+      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
       const depositWei = ethers.utils.parseEther(rawAmount);
-      let tx = await stableCoinContract.approve(vaultAddress, depositWei);
+      let tx = await stableCoinContract.approve(contractAddresses.vault, depositWei);
       log("Approving vault to spend " + rawAmount + " tokens...");
       await tx.wait();
       log("Approval confirmed.");
@@ -153,7 +168,6 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // Deposit to a specific address
   const handleDepositTo = async () => {
     if (!depositRecipient || !ethers.utils.isAddress(depositRecipient)) {
       alert("Please enter a valid recipient address.");
@@ -187,12 +201,12 @@ const AdminPage = ({ currentAccount }) => {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const depositWei = ethers.utils.parseEther("100");
-      const stableCoinContract = new ethers.Contract(stableCoinAddress, stableCoinABI, signer);
-      let approveTx = await stableCoinContract.approve(vaultAddress, depositWei);
+      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
+      let approveTx = await stableCoinContract.approve(contractAddresses.vault, depositWei);
       log("Approving vault to spend 100 tokens...");
       await approveTx.wait();
       log("Approval confirmed.");
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
       let tx = await vaultContract.depositTo(depositRecipient, depositWei, metaURI);
       log("Depositing stablecoins and minting NFT to " + depositRecipient + "...");
       await tx.wait();
@@ -203,7 +217,6 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // CSV Batch deposit
   const handleCSVDeposit = async () => {
     if (!csvFile) {
       alert("Please select a CSV file.");
@@ -243,12 +256,12 @@ const AdminPage = ({ currentAccount }) => {
       const totalDeposit = ethers.utils.parseEther((recipients.length * 100).toString());
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const stableCoinContract = new ethers.Contract(stableCoinAddress, stableCoinABI, signer);
-      let tx = await stableCoinContract.approve(vaultAddress, totalDeposit);
+      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
+      let tx = await stableCoinContract.approve(contractAddresses.vault, totalDeposit);
       log("Approving vault for batch deposit of " + (recipients.length * 100) + " tokens...");
       await tx.wait();
       log("Approval confirmed.");
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
       tx = await vaultContract.batchDeposit(recipients, metadataURIs);
       log("Batch deposit transaction submitted...");
       await tx.wait();
@@ -259,12 +272,11 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // Burn NFT (redeem)
   const handleBurn = async (tokenId) => {
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
       log("Burning NFT tokenId: " + tokenId + " to redeem stablecoins...");
       const tx = await vaultContract.redeem(tokenId);
       await tx.wait();
@@ -275,7 +287,6 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // Transfer NFT
   const handleTransfer = async (tokenId) => {
     const recipient = prompt("Enter recipient address:");
     if (!recipient || !ethers.utils.isAddress(recipient)) {
@@ -285,7 +296,7 @@ const AdminPage = ({ currentAccount }) => {
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const nftContract = new ethers.Contract(silverbacksNftAddress, nftABI, signer);
+      const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, signer);
       log("Transferring NFT tokenId " + tokenId + " to " + recipient + "...");
       const tx = await nftContract["safeTransferFrom(address,address,uint256)"](currentAccount, recipient, tokenId);
       await tx.wait();
@@ -329,12 +340,10 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // Listen for account or chain changes (optional if handled in Header)
   useEffect(() => {
     if (window.ethereum) {
       window.ethereum.on("accountsChanged", (accounts) => {
         if (accounts.length > 0) {
-          // In admin page, we expect currentAccount to be managed in the parent
           log("Account changed to: " + accounts[0]);
         }
       });
@@ -355,9 +364,7 @@ const AdminPage = ({ currentAccount }) => {
           </p>
           <div style={sectionStyle}>
             <h2>Mint Silverbacks (to Self)</h2>
-            <p>
-              Deposit must be a multiple of 100. You’ll receive 1 NFT per $100 deposited.
-            </p>
+            <p>Deposit must be a multiple of 100. You’ll receive 1 NFT per $100 deposited.</p>
             <div style={inputGroupStyle}>
               <input type="file" accept="image/*" onChange={handleFrontImageChange} />
               <input type="file" accept="image/*" onChange={handleBackImageChange} />
@@ -371,16 +378,14 @@ const AdminPage = ({ currentAccount }) => {
                 style={inputStyle}
               />
               <button onClick={handleDeposit} style={buttonStyle}>
-                Deposit & Mint
+                Deposit &amp; Mint
               </button>
             </div>
           </div>
           <hr style={dividerStyle} />
           <div style={sectionStyle}>
             <h2>Mint Silverback to a Specific Address</h2>
-            <p>
-              Deposit exactly 100 stablecoins to mint a Silverback NFT to a chosen recipient.
-            </p>
+            <p>Deposit exactly 100 stablecoins to mint a Silverback NFT to a chosen recipient.</p>
             <div style={inputGroupStyle}>
               <input
                 type="text"
@@ -393,7 +398,7 @@ const AdminPage = ({ currentAccount }) => {
               <input type="file" accept="image/*" onChange={handleBackImageChange} />
             </div>
             <button onClick={handleDepositTo} style={buttonStyle}>
-              Deposit & Mint to Recipient
+              Deposit &amp; Mint to Recipient
             </button>
           </div>
           <hr style={dividerStyle} />
@@ -442,7 +447,7 @@ const AdminPage = ({ currentAccount }) => {
                       <p>No images available.</p>
                     )}
                     <button onClick={() => handleBurn(n.tokenId)} style={buttonStyle}>
-                      Burn & Redeem
+                      Burn &amp; Redeem
                     </button>
                     <button onClick={() => handleTransfer(n.tokenId)} style={{ ...buttonStyle, marginTop: "0.5rem" }}>
                       Transfer NFT
@@ -466,6 +471,7 @@ const AdminPage = ({ currentAccount }) => {
   );
 };
 
+// Styles
 const pageContainerStyle = {
   padding: "2rem",
   backgroundColor: "#fff",
@@ -475,66 +481,14 @@ const pageContainerStyle = {
   maxWidth: "900px"
 };
 
-const sectionStyle = {
-  marginBottom: "1.5rem"
-};
-
-const inputGroupStyle = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "0.5rem",
-  marginBottom: "1rem"
-};
-
-const inputStyle = {
-  padding: "0.5rem",
-  fontSize: "1rem"
-};
-
-const buttonStyle = {
-  padding: "0.5rem 1rem",
-  backgroundColor: "#4CAF50",
-  color: "#fff",
-  border: "none",
-  borderRadius: "4px",
-  cursor: "pointer",
-  fontSize: "1rem"
-};
-
-const dividerStyle = {
-  margin: "1.5rem 0",
-  border: "none",
-  borderTop: "1px solid #ddd"
-};
-
-const nftGridStyle = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "1rem",
-  marginTop: "1rem"
-};
-
-const nftCardStyle = {
-  padding: "1rem",
-  border: "1px solid #ddd",
-  borderRadius: "8px",
-  backgroundColor: "#f9f9f9",
-  textAlign: "center"
-};
-
-const imageStyle = {
-  width: "100%",
-  borderRadius: "4px"
-};
-
-const debugLogStyle = {
-  marginTop: "2rem",
-  backgroundColor: "#333",
-  color: "#fff",
-  padding: "1rem",
-  borderRadius: "4px",
-  maxHeight: "200px",
-  overflowY: "auto"
-};
+const sectionStyle = { marginBottom: "1.5rem" };
+const inputGroupStyle = { display: "flex", flexDirection: "column", gap: "0.5rem", marginBottom: "1rem" };
+const inputStyle = { padding: "0.5rem", fontSize: "1rem" };
+const buttonStyle = { padding: "0.5rem 1rem", backgroundColor: "#4CAF50", color: "#fff", border: "none", borderRadius: "4px", cursor: "pointer", fontSize: "1rem" };
+const dividerStyle = { margin: "1.5rem 0", border: "none", borderTop: "1px solid #ddd" };
+const nftGridStyle = { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem", marginTop: "1rem" };
+const nftCardStyle = { padding: "1rem", border: "1px solid #ddd", borderRadius: "8px", backgroundColor: "#f9f9f9", textAlign: "center" };
+const imageStyle = { width: "100%", borderRadius: "4px" };
+const debugLogStyle = { marginTop: "2rem", backgroundColor: "#333", color: "#fff", padding: "1rem", borderRadius: "4px", maxHeight: "200px", overflowY: "auto" };
 
 export default AdminPage;
