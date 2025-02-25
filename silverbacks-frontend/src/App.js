@@ -201,11 +201,18 @@ function App() {
       const metaURI = "ipfs://" + metadataCID;
       log("Metadata JSON uploaded with URI: " + metaURI);
 
-      // Call depositTo on the vault (note: depositAmount must be exactly 100 tokens).
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
       const depositWei = ethers.utils.parseEther("100"); // exactly $100 deposit
+
+      // *** New Approval Step ***
+      const stableCoinContract = new ethers.Contract(stableCoinAddress, stableCoinABI, signer);
+      let approveTx = await stableCoinContract.approve(vaultAddress, depositWei);
+      log("Approving vault to spend 100 tokens...");
+      await approveTx.wait();
+      log("Approval confirmed.");
+
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
       let tx = await vaultContract.depositTo(depositRecipient, depositWei, metaURI);
       log("Depositing stablecoins and minting NFT to " + depositRecipient + "...");
       await tx.wait();
@@ -372,7 +379,6 @@ function App() {
   };
 
   const handleTransfer = async (tokenId) => {
-    // Existing transfer functionality remains unchanged.
     const recipient = prompt("Enter recipient address:");
     if (!recipient || !ethers.utils.isAddress(recipient)) {
       alert("Invalid Ethereum address.");
@@ -469,6 +475,13 @@ function App() {
               </p>
               <p>
                 Your StableCoin Balance: <b>{stableCoinBalance}</b> MSC
+              </p>
+              {/* New section to display contract addresses */}
+              <p>
+                <b>StableCoin (ERC20) Address:</b> {stableCoinAddress}
+              </p>
+              <p>
+                <b>Silverbacks NFT (ERC721) Address:</b> {silverbacksNftAddress}
               </p>
               <hr />
 
