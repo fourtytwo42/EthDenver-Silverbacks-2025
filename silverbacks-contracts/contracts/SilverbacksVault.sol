@@ -15,15 +15,19 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
  *
  * NOTE on decimals:
  *   - The MyStableCoin is assumed to have 18 decimals (standard ERC-20).
- *   - Each "Silverback" NFT is notionally worth $100, i.e. 100 * 10^18.
+ *   - Each "silverback" represents $100 in stableCoin (i.e. 100 * 1e18).
  *     We call this value NOTE_SIZE.
  *   - The NFT’s faceValue is stored as “100” (no decimals). When transferring
  *     stablecoins the faceValue is multiplied by 1e18.
  *
  * New Functions Added:
  *   - depositTo and batchDeposit: see below.
- *   - redeemWithAuth: allows a third party (paying gas) to redeem an NFT on behalf of the owner,
- *     if the owner provides a signature (from the private key passed in via the redemption page).
+ *   - redeemWithAuth: allows a third party (paying gas) to redeem an NFT on behalf of its owner,
+ *     if the owner provides a signature.
+ *
+ * NEW FUNCTIONS ADDED:
+ *   - redeemTo: burns the NFT and sends the $100 stablecoins to the caller (instead of the NFT owner).
+ *   - claimNFT: transfers the NFT from the original owner to the caller.
  */
 contract SilverbacksVault is Ownable {
     using ECDSA for bytes32;
@@ -40,6 +44,8 @@ contract SilverbacksVault is Ownable {
     event Deposited(address indexed depositor, uint256 depositAmount, uint256 mintedCount, uint256 remainder);
     event BatchDeposited(address indexed depositor, uint256 totalAmount, uint256 mintedCount);
     event Redeemed(address indexed redeemer, uint256 tokenId, uint256 faceValue);
+    // New event for NFT claim.
+    event ClaimedNFT(uint256 indexed tokenId, address indexed newOwner);
 
     constructor(address _stableCoin, address _silverbacksNFT) {
         stableCoin = IERC20(_stableCoin);
@@ -48,6 +54,7 @@ contract SilverbacksVault is Ownable {
     }
 
     /**
+     * deposit:
      * Deposit stablecoins in multiples of $100 along with a metadata URI.
      * If depositAmount is not a multiple of NOTE_SIZE, the remainder is refunded.
      * NFTs are minted to msg.sender.
@@ -179,7 +186,6 @@ contract SilverbacksVault is Ownable {
      */
     function redeemWithAuth(uint256 tokenId, bytes calldata signature) external {
         address nftOwner = silverbacksNFT.ownerOf(tokenId);
-        // Construct the message hash. (Make sure the same message is signed off‐chain.)
         bytes32 messageHash = keccak256(abi.encodePacked("Redeem:", tokenId));
         bytes32 ethSignedMessageHash = ECDSA.toEthSignedMessageHash(messageHash);
         address recovered = ethSignedMessageHash.recover(signature);
@@ -196,5 +202,51 @@ contract SilverbacksVault is Ownable {
         );
 
         emit Redeemed(nftOwner, tokenId, 100);
+    }
+
+    /**
+     * redeemTo:
+     * Allows anyone (paying gas) to redeem an NFT on behalf of its owner.
+     * The NFT owner must sign "Redeem:" concatenated with the tokenId.
+     * Instead of transferring stablecoins to the NFT owner, this function sends
+     * the stablecoins to msg.sender (the redeemer), while burning the NFT.
+     */
+    function redeemTo(uint256 tokenId, bytes calldata signature) external {
+        address nftOwner = silverbacksNFT.ownerOf(tokenId);
+        bytes32 messageHash = keccak256(abi.encodePacked("Redeem:", tokenId));
+        bytes32 ethSignedMessageHash = ECDSA.toEthSignedMessageHash(messageHash);
+        address recovered = ethSignedMessageHash.recover(signature);
+        require(recovered == nftOwner, "Invalid signature");
+
+        // Burn the NFT.
+        silverbacksNFT.burn(tokenId);
+
+        // Transfer stablecoins to msg.sender.
+        uint256 actualAmount = 100 * 10**18;
+        require(
+            stableCoin.transfer(msg.sender, actualAmount),
+            "Stablecoin transfer failed"
+        );
+
+        emit Redeemed(msg.sender, tokenId, 100);
+    }
+
+    /**
+     * claimNFT:
+     * Allows anyone (paying gas) to claim the NFT on behalf of its owner.
+     * The NFT owner must sign "Claim:" concatenated with the tokenId.
+     * Instead of burning the NFT, it is transferred to msg.sender.
+     */
+    function claimNFT(uint256 tokenId, bytes calldata signature) external {
+        address nftOwner = silverbacksNFT.ownerOf(tokenId);
+        bytes32 messageHash = keccak256(abi.encodePacked("Claim:", tokenId));
+        bytes32 ethSignedMessageHash = ECDSA.toEthSignedMessageHash(messageHash);
+        address recovered = ethSignedMessageHash.recover(signature);
+        require(recovered == nftOwner, "Invalid signature");
+
+        // Transfer NFT from nftOwner to msg.sender.
+        silverbacksNFT.safeTransferFrom(nftOwner, msg.sender, tokenId);
+
+        emit ClaimedNFT(tokenId, msg.sender);
     }
 }

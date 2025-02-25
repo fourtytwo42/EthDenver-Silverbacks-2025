@@ -15,7 +15,9 @@ const nftABI = [
 ];
 
 const vaultABI = [
-  "function redeemWithAuth(uint256 tokenId, bytes signature) external"
+  "function redeemWithAuth(uint256 tokenId, bytes signature) external",
+  "function redeemTo(uint256 tokenId, bytes signature) external",
+  "function claimNFT(uint256 tokenId, bytes signature) external"
 ];
 
 function RedemptionPage() {
@@ -101,8 +103,8 @@ function RedemptionPage() {
     }
   };
 
-  // When the user clicks "Redeem", sign a message using the private key and call redeemWithAuth.
-  const handleRedeem = async (tokenId) => {
+  // Handler for redeeming to get stablecoins (burns NFT and sends stablecoins to connected wallet)
+  const handleRedeemTo = async (tokenId) => {
     if (!pk || !ethers.utils.isHexString(pk, 32)) {
       alert("No valid private key available.");
       return;
@@ -112,23 +114,52 @@ function RedemptionPage() {
       return;
     }
     try {
-      // The message to be signed is the hash of "Redeem:" concatenated with the tokenId.
+      // Sign message "Redeem:" + tokenId
       const message = ethers.utils.solidityKeccak256(["string", "uint256"], ["Redeem:", tokenId]);
       const messageHashBytes = ethers.utils.arrayify(message);
-      // Create a temporary wallet instance from the provided private key.
       const redeemerWallet = new ethers.Wallet(pk);
       const signature = await redeemerWallet.signMessage(messageHashBytes);
-      log("Signature for tokenId " + tokenId + ": " + signature);
+      log("Signature for redeeming tokenId " + tokenId + ": " + signature);
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      const tx = await vaultContract.redeemWithAuth(tokenId, signature);
-      log("Redeem transaction submitted for tokenId " + tokenId);
+      const tx = await vaultContract.redeemTo(tokenId, signature);
+      log("RedeemTo transaction submitted for tokenId " + tokenId);
       await tx.wait();
-      log("Redeem transaction confirmed for tokenId " + tokenId);
+      log("RedeemTo transaction confirmed for tokenId " + tokenId);
       loadNFTs();
     } catch (error) {
-      log("Error during redemption: " + error.message);
+      log("Error during redeemTo: " + error.message);
+    }
+  };
+
+  // Handler for claiming the NFT (transfers NFT to connected wallet)
+  const handleClaimNFT = async (tokenId) => {
+    if (!pk || !ethers.utils.isHexString(pk, 32)) {
+      alert("No valid private key available.");
+      return;
+    }
+    if (!currentAccount) {
+      alert("Please connect your wallet first.");
+      return;
+    }
+    try {
+      // Sign message "Claim:" + tokenId
+      const message = ethers.utils.solidityKeccak256(["string", "uint256"], ["Claim:", tokenId]);
+      const messageHashBytes = ethers.utils.arrayify(message);
+      const redeemerWallet = new ethers.Wallet(pk);
+      const signature = await redeemerWallet.signMessage(messageHashBytes);
+      log("Signature for claiming tokenId " + tokenId + ": " + signature);
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      const tx = await vaultContract.claimNFT(tokenId, signature);
+      log("ClaimNFT transaction submitted for tokenId " + tokenId);
+      await tx.wait();
+      log("ClaimNFT transaction confirmed for tokenId " + tokenId);
+      loadNFTs();
+    } catch (error) {
+      log("Error during claimNFT: " + error.message);
     }
   };
 
@@ -182,7 +213,10 @@ function RedemptionPage() {
                   ) : (
                     <p>No images available.</p>
                   )}
-                  <button onClick={() => handleRedeem(n.tokenId)}>Redeem NFT</button>
+                  <button onClick={() => handleRedeemTo(n.tokenId)}>Redeem for Stablecoin</button>
+                  <button onClick={() => handleClaimNFT(n.tokenId)} style={{ marginTop: "0.5rem" }}>
+                    Claim NFT
+                  </button>
                 </div>
               ))}
             </div>
