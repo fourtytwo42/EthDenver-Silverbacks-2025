@@ -20,7 +20,8 @@ const nftABI = [
   "function balanceOf(address) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   "function faceValue(uint256 tokenId) view returns (uint256)",
-  "function tokenURI(uint256 tokenId) view returns (string)"
+  "function tokenURI(uint256 tokenId) view returns (string)",
+  "function safeTransferFrom(address from, address to, uint256 tokenId)"
 ];
 
 const vaultABI = [
@@ -48,6 +49,10 @@ function App() {
   // New states for image upload:
   const [frontImageFile, setFrontImageFile] = useState(null);
   const [backImageFile, setBackImageFile] = useState(null);
+
+  // New states for NFT transfer:
+  const [transferAddresses, setTransferAddresses] = useState({});
+  const [transferVisible, setTransferVisible] = useState({});
 
   const log = (msg) => {
     console.log(msg);
@@ -245,7 +250,27 @@ function App() {
     }
   };
 
-  // --- Handlers for file inputs in the mint section ---
+  const handleTransfer = async (tokenId) => {
+    const recipient = transferAddresses[tokenId];
+    if (!recipient || !ethers.utils.isAddress(recipient)) {
+      alert("Please enter a valid Ethereum address for transfer.");
+      return;
+    }
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const nftContract = new ethers.Contract(silverbacksNftAddress, nftABI, signer);
+      log("Transferring NFT tokenId " + tokenId + " to " + recipient + "...");
+      const tx = await nftContract["safeTransferFrom(address,address,uint256)"](currentAccount, recipient, tokenId);
+      await tx.wait();
+      log("Transfer transaction confirmed for tokenId " + tokenId);
+      await loadData();
+    } catch (err) {
+      console.error("Error transferring NFT:", err);
+      log("Error transferring NFT: " + err.message);
+    }
+  };
+
   const handleFrontImageChange = (e) => {
     if (e.target.files.length > 0) {
       const file = e.target.files[0];
@@ -308,18 +333,30 @@ function App() {
             </div>
           ) : (
             <div>
-              <p>Wallet Connected: <b>{currentAccount}</b></p>
-              <p>Your StableCoin Balance: <b>{stableCoinBalance}</b> MSC</p>
+              <p>
+                Wallet Connected: <b>{currentAccount}</b>
+              </p>
+              <p>
+                Your StableCoin Balance: <b>{stableCoinBalance}</b> MSC
+              </p>
               <hr />
               <h2>Mint Silverbacks</h2>
-              <p>Deposit must be a multiple of 100. You’ll receive 1 NFT per each $100 deposited.</p>
+              <p>
+                Deposit must be a multiple of 100. You’ll receive 1 NFT per each $100 deposited.
+              </p>
               <div style={{ marginBottom: "1rem" }}>
                 <input type="file" accept="image/*" onChange={handleFrontImageChange} />
-                <br /><br />
+                <br />
+                <br />
                 <input type="file" accept="image/*" onChange={handleBackImageChange} />
               </div>
               <div style={{ marginBottom: "1rem" }}>
-                <input type="number" step="100" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
+                <input
+                  type="number"
+                  step="100"
+                  value={depositAmount}
+                  onChange={(e) => setDepositAmount(e.target.value)}
+                />
                 <button onClick={handleDeposit}>Deposit & Mint</button>
               </div>
               <hr />
@@ -330,19 +367,59 @@ function App() {
                 <div className="nft-grid">
                   {nfts.map((n) => (
                     <div key={n.tokenId} className="nft-card">
-                      <p><b>Token ID:</b> {n.tokenId}</p>
-                      <p><b>Face Value:</b> {n.faceValue} USD</p>
+                      <p>
+                        <b>Token ID:</b> {n.tokenId}
+                      </p>
+                      <p>
+                        <b>Face Value:</b> {n.faceValue} USD
+                      </p>
                       {n.image ? (
                         <div>
-                          <img src={n.image.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")} alt="NFT Image" style={{ width: "100%" }} />
+                          <img
+                            src={n.image.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
+                            alt="NFT Front"
+                            style={{ width: "100%" }}
+                          />
                           {n.imageBack && (
-                            <img src={n.imageBack.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")} alt="Back Image" style={{ width: "100%", marginTop: "0.5rem" }} />
+                            <img
+                              src={n.imageBack.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
+                              alt="NFT Back"
+                              style={{ width: "100%", marginTop: "0.5rem" }}
+                            />
                           )}
                         </div>
                       ) : (
                         <p>No images available.</p>
                       )}
                       <button onClick={() => handleBurn(n.tokenId)}>Burn & Redeem</button>
+                      <button
+                        onClick={() =>
+                          setTransferVisible({
+                            ...transferVisible,
+                            [n.tokenId]: !transferVisible[n.tokenId]
+                          })
+                        }
+                        style={{ marginTop: "0.5rem" }}
+                      >
+                        {transferVisible[n.tokenId] ? "Cancel Transfer" : "Transfer NFT"}
+                      </button>
+                      {transferVisible[n.tokenId] && (
+                        <div style={{ marginTop: "0.5rem" }}>
+                          <input
+                            type="text"
+                            placeholder="Recipient address"
+                            value={transferAddresses[n.tokenId] || ""}
+                            onChange={(e) =>
+                              setTransferAddresses({
+                                ...transferAddresses,
+                                [n.tokenId]: e.target.value
+                              })
+                            }
+                            style={{ marginBottom: "0.5rem", width: "100%" }}
+                          />
+                          <button onClick={() => handleTransfer(n.tokenId)}>Confirm Transfer</button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -358,7 +435,9 @@ function App() {
         <h3>Debug Log</h3>
         <div style={{ maxHeight: "200px", overflowY: "auto" }}>
           {logMessages.map((msg, idx) => (
-            <p key={idx} style={{ margin: 0, fontFamily: "monospace" }}>{msg}</p>
+            <p key={idx} style={{ margin: 0, fontFamily: "monospace" }}>
+              {msg}
+            </p>
           ))}
         </div>
       </div>
