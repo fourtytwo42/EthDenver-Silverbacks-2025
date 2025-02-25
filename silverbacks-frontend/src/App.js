@@ -29,10 +29,10 @@ const vaultABI = [
 ];
 
 /*
-  Create an IPFS client using your node’s API endpoint (port 5001).
-  (Make sure your IPFS node’s API is configured with CORS disabled/allowing all origins.)
+  Create an IPFS client using your node’s API endpoint.
+  Update the URL to use HTTPS and the API reverse proxy path (/api/v0).
 */
-const ipfsClient = create({ url: "http://silverbacksipfs.online:5001" });
+const ipfsClient = create({ url: "https://silverbacksipfs.online/api/v0" });
 
 // Maximum file size allowed (5 MB)
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB in bytes
@@ -132,8 +132,9 @@ function App() {
         log(`Token ID ${tokenId} metadata URI: ${tokenURI}`);
         let metadata = {};
         try {
-          // Instead of using the API cat endpoint, use the gateway URL directly.
-          const response = await fetch("http://silverbacksipfs.online:8080/ipfs/" + tokenURI.slice(7));
+          // Use the HTTPS gateway to fetch the metadata JSON.
+          // Remove the "ipfs://" prefix and prepend the HTTPS gateway URL.
+          const response = await fetch("https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7));
           metadata = await response.json();
         } catch (err) {
           log("Error fetching metadata for token " + tokenId + ": " + err.message);
@@ -329,8 +330,8 @@ function App() {
                       <p><b>Face Value:</b> {n.faceValue} USD</p>
                       {n.imageFront && n.imageBack ? (
                         <div>
-                          <img src={n.imageFront.replace("ipfs://", "http://silverbacksipfs.online:8080/ipfs/")} alt="Front" style={{ width: "100%", marginBottom: "0.5rem" }} />
-                          <img src={n.imageBack.replace("ipfs://", "http://silverbacksipfs.online:8080/ipfs/")} alt="Back" style={{ width: "100%" }} />
+                          <img src={n.imageFront.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")} alt="Front" style={{ width: "100%", marginBottom: "0.5rem" }} />
+                          <img src={n.imageBack.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")} alt="Back" style={{ width: "100%" }} />
                         </div>
                       ) : (
                         <p>No images available.</p>
