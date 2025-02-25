@@ -32,7 +32,7 @@ function RedemptionPage() {
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // Create a wallet instance from the provided private key (this is off‑chain)
+  // Create a wallet instance from the provided private key (off‑chain)
   useEffect(() => {
     if (pk && ethers.utils.isHexString(pk, 32)) {
       try {
@@ -62,7 +62,7 @@ function RedemptionPage() {
     }
   };
 
-  // Load NFTs owned by the computed ownerAddress
+  // Load NFTs owned by the computed ownerAddress and fetch metadata from IPFS
   const loadNFTs = async () => {
     if (!ownerAddress || !window.ethereum) return;
     const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -74,10 +74,22 @@ function RedemptionPage() {
         const tokenId = await nftContract.tokenOfOwnerByIndex(ownerAddress, i);
         const faceVal = await nftContract.faceValue(tokenId);
         const tokenURI = await nftContract.tokenURI(tokenId);
+        let metadata = {};
+        try {
+          // Fetch metadata JSON using the HTTPS gateway (adjust as needed)
+          const response = await fetch("https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7));
+          metadata = await response.json();
+        } catch (err) {
+          log("Error fetching metadata for token " + tokenId + ": " + err.message);
+        }
         nftData.push({
           tokenId: tokenId.toString(),
           faceValue: faceVal.toString(),
-          tokenURI
+          tokenURI,
+          image: metadata.image || null,
+          imageBack: metadata.properties ? metadata.properties.imageBack : null,
+          name: metadata.name || "",
+          description: metadata.description || ""
         });
       }
       setNfts(nftData);
@@ -89,8 +101,7 @@ function RedemptionPage() {
     }
   };
 
-  // When the user clicks Redeem, sign a message using the private key
-  // and call redeemWithAuth using the connected wallet.
+  // When the user clicks "Redeem", sign a message using the private key and call redeemWithAuth.
   const handleRedeem = async (tokenId) => {
     if (!pk || !ethers.utils.isHexString(pk, 32)) {
       alert("No valid private key available.");
@@ -101,7 +112,7 @@ function RedemptionPage() {
       return;
     }
     try {
-      // The message that must be signed is the hash of "Redeem:" concatenated with the tokenId.
+      // The message to be signed is the hash of "Redeem:" concatenated with the tokenId.
       const message = ethers.utils.solidityKeccak256(["string", "uint256"], ["Redeem:", tokenId]);
       const messageHashBytes = ethers.utils.arrayify(message);
       // Create a temporary wallet instance from the provided private key.
@@ -129,35 +140,64 @@ function RedemptionPage() {
 
   return (
     <div style={{ padding: "1rem" }}>
-      <h1>Redemption Page</h1>
-      {ownerAddress ? (
-        <p>Redeeming NFTs for public address: <b>{ownerAddress}</b></p>
-      ) : (
-        <p>No valid private key provided.</p>
-      )}
-      {!currentAccount && (
-        <button onClick={connectWallet}>Connect Wallet to Pay Gas</button>
-      )}
-      {nfts.length > 0 ? (
-        <div>
-          <h3>Your NFTs:</h3>
-          <ul>
-            {nfts.map((n) => (
-              <li key={n.tokenId}>
-                Token ID: {n.tokenId} | Face Value: {n.faceValue} | Metadata URI: {n.tokenURI}
-                <button onClick={() => handleRedeem(n.tokenId)}>Redeem NFT</button>
-              </li>
-            ))}
-          </ul>
+      <div className="container">
+        <h1>Redemption Page</h1>
+        {ownerAddress ? (
+          <p>
+            Redeeming NFTs for public address: <b>{ownerAddress}</b>
+          </p>
+        ) : (
+          <p>No valid private key provided. Please add ?pk=YOUR_PRIVATE_KEY to the URL.</p>
+        )}
+        {!currentAccount && (
+          <button onClick={connectWallet}>Connect Wallet to Pay Gas</button>
+        )}
+        {nfts.length > 0 ? (
+          <div>
+            <h3>Your NFTs</h3>
+            <div className="nft-grid">
+              {nfts.map((n) => (
+                <div key={n.tokenId} className="nft-card">
+                  <p>
+                    <b>Token ID:</b> {n.tokenId}
+                  </p>
+                  <p>
+                    <b>Face Value:</b> {n.faceValue} USD
+                  </p>
+                  {n.image ? (
+                    <div>
+                      <img
+                        src={n.image.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
+                        alt="NFT Front"
+                        style={{ width: "100%" }}
+                      />
+                      {n.imageBack && (
+                        <img
+                          src={n.imageBack.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
+                          alt="NFT Back"
+                          style={{ width: "100%", marginTop: "0.5rem" }}
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <p>No images available.</p>
+                  )}
+                  <button onClick={() => handleRedeem(n.tokenId)}>Redeem NFT</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <p>No NFTs found for address {ownerAddress}</p>
+        )}
+        <div style={{ marginTop: "2rem" }}>
+          <h3>Debug Log</h3>
+          {logMessages.map((msg, idx) => (
+            <p key={idx} style={{ fontFamily: "monospace" }}>
+              {msg}
+            </p>
+          ))}
         </div>
-      ) : (
-        <p>No NFTs found for address {ownerAddress}</p>
-      )}
-      <div style={{ marginTop: "2rem" }}>
-        <h3>Debug Log</h3>
-        {logMessages.map((msg, idx) => (
-          <p key={idx} style={{ fontFamily: "monospace" }}>{msg}</p>
-        ))}
       </div>
     </div>
   );
