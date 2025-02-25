@@ -40,7 +40,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB in bytes
 function App() {
   const [currentAccount, setCurrentAccount] = useState(null);
   const [stableCoinBalance, setStableCoinBalance] = useState("0");
-  // Array of objects: { tokenId, faceValue, imageFront, imageBack, name, description }
+  // Array of objects: { tokenId, faceValue, image, imageBack, name, description }
   const [nfts, setNfts] = useState([]);
   const [depositAmount, setDepositAmount] = useState("100");
   const [logMessages, setLogMessages] = useState([]);
@@ -142,8 +142,8 @@ function App() {
         nftData.push({
           tokenId: tokenId.toString(),
           faceValue: faceValue.toString(),
-          imageFront: metadata.imageFront || null,
-          imageBack: metadata.imageBack || null,
+          image: metadata.image || null,
+          imageBack: metadata.properties?.imageBack || null,
           name: metadata.name || "",
           description: metadata.description || ""
         });
@@ -188,11 +188,15 @@ function App() {
       const backImageCID = backAdded.path;
       log("Back image uploaded with CID: " + backImageCID);
       
+      // Update metadata to follow OpenSea metadata standard:
+      // Use 'image' as the primary image and include the back image in properties.
       const metadata = {
         name: "Silverback NFT",
-        description: "An NFT representing a $100 bill with two images.",
-        imageFront: "ipfs://" + frontImageCID,
-        imageBack: "ipfs://" + backImageCID
+        description: "An NFT representing a $100 bill.",
+        image: "ipfs://" + frontImageCID,
+        properties: {
+          imageBack: "ipfs://" + backImageCID
+        }
       };
       const metadataString = JSON.stringify(metadata);
       const metadataAdded = await ipfsClient.add(metadataString);
@@ -328,10 +332,12 @@ function App() {
                     <div key={n.tokenId} className="nft-card">
                       <p><b>Token ID:</b> {n.tokenId}</p>
                       <p><b>Face Value:</b> {n.faceValue} USD</p>
-                      {n.imageFront && n.imageBack ? (
+                      {n.image ? (
                         <div>
-                          <img src={n.imageFront.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")} alt="Front" style={{ width: "100%", marginBottom: "0.5rem" }} />
-                          <img src={n.imageBack.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")} alt="Back" style={{ width: "100%" }} />
+                          <img src={n.image.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")} alt="NFT Image" style={{ width: "100%" }} />
+                          {n.imageBack && (
+                            <img src={n.imageBack.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")} alt="Back Image" style={{ width: "100%", marginTop: "0.5rem" }} />
+                          )}
                         </div>
                       ) : (
                         <p>No images available.</p>
