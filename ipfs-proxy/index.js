@@ -7,8 +7,10 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const QUICKNODE_IPFS_URL = process.env.QUICKNODE_IPFS_URL || 'https://rays-automobile-clearly.quicknode-ipfs.com';
 
-app.use(cors());
+// Use a raw body parser for /api/ipfs routes with an increased limit
+app.use('/api/ipfs', express.raw({ type: '*/*', limit: '50mb' }));
 app.use(express.json());
+app.use(cors());
 
 // Proxy endpoint for IPFS API calls.
 // Requests to /api/ipfs/* will be forwarded to QUICKNODE_IPFS_URL with a path rewrite.

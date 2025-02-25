@@ -28,8 +28,14 @@ const vaultABI = [
   "function redeem(uint256 tokenId) external"
 ];
 
-// Create an IPFS client pointing to your QuickNode IPFS endpoint.
-const ipfsClient = create({ url: "https://rays-automobile-clearly.quicknode-ipfs.com" });
+/*
+  Create an IPFS client using your node’s API endpoint (port 5001).
+  (Make sure your IPFS node’s API is configured with CORS disabled/allowing all origins.)
+*/
+const ipfsClient = create({ url: "http://silverbacksipfs.online:5001" });
+
+// Maximum file size allowed (5 MB)
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB in bytes
 
 function App() {
   const [currentAccount, setCurrentAccount] = useState(null);
@@ -126,7 +132,8 @@ function App() {
         log(`Token ID ${tokenId} metadata URI: ${tokenURI}`);
         let metadata = {};
         try {
-          const response = await fetch(tokenURI.replace("ipfs://", "https://ipfs.io/ipfs/"));
+          // Instead of using the API cat endpoint, use the gateway URL directly.
+          const response = await fetch("http://silverbacksipfs.online:8080/ipfs/" + tokenURI.slice(7));
           metadata = await response.json();
         } catch (err) {
           log("Error fetching metadata for token " + tokenId + ": " + err.message);
@@ -171,16 +178,15 @@ function App() {
       return;
     }
     try {
-      // --- Upload images and metadata to IPFS ---
-      // Upload front image
+      // --- Upload images and metadata to IPFS via your node ---
       const frontAdded = await ipfsClient.add(frontImageFile);
       const frontImageCID = frontAdded.path;
       log("Front image uploaded with CID: " + frontImageCID);
-      // Upload back image
+      
       const backAdded = await ipfsClient.add(backImageFile);
       const backImageCID = backAdded.path;
       log("Back image uploaded with CID: " + backImageCID);
-      // Create metadata JSON
+      
       const metadata = {
         name: "Silverback NFT",
         description: "An NFT representing a $100 bill with two images.",
@@ -237,15 +243,25 @@ function App() {
   // --- Handlers for file inputs in the mint section ---
   const handleFrontImageChange = (e) => {
     if (e.target.files.length > 0) {
-      setFrontImageFile(e.target.files[0]);
-      log("Front image selected: " + e.target.files[0].name);
+      const file = e.target.files[0];
+      if (file.size > MAX_FILE_SIZE) {
+        alert("Front image is too large. Please select an image smaller than 5 MB.");
+        return;
+      }
+      setFrontImageFile(file);
+      log("Front image selected: " + file.name);
     }
   };
 
   const handleBackImageChange = (e) => {
     if (e.target.files.length > 0) {
-      setBackImageFile(e.target.files[0]);
-      log("Back image selected: " + e.target.files[0].name);
+      const file = e.target.files[0];
+      if (file.size > MAX_FILE_SIZE) {
+        alert("Back image is too large. Please select an image smaller than 5 MB.");
+        return;
+      }
+      setBackImageFile(file);
+      log("Back image selected: " + file.name);
     }
   };
 
@@ -292,7 +308,6 @@ function App() {
               <hr />
               <h2>Mint Silverbacks</h2>
               <p>Deposit must be a multiple of 100. You’ll receive 1 NFT per each $100 deposited.</p>
-              {/* File inputs for images are now integrated here */}
               <div style={{ marginBottom: "1rem" }}>
                 <input type="file" accept="image/*" onChange={handleFrontImageChange} />
                 <br /><br />
@@ -314,8 +329,8 @@ function App() {
                       <p><b>Face Value:</b> {n.faceValue} USD</p>
                       {n.imageFront && n.imageBack ? (
                         <div>
-                          <img src={n.imageFront.replace("ipfs://", "https://ipfs.io/ipfs/")} alt="Front" style={{ width: "100%", marginBottom: "0.5rem" }} />
-                          <img src={n.imageBack.replace("ipfs://", "https://ipfs.io/ipfs/")} alt="Back" style={{ width: "100%" }} />
+                          <img src={n.imageFront.replace("ipfs://", "http://silverbacksipfs.online:8080/ipfs/")} alt="Front" style={{ width: "100%", marginBottom: "0.5rem" }} />
+                          <img src={n.imageBack.replace("ipfs://", "http://silverbacksipfs.online:8080/ipfs/")} alt="Back" style={{ width: "100%" }} />
                         </div>
                       ) : (
                         <p>No images available.</p>
