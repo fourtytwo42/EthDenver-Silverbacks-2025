@@ -8,19 +8,21 @@ import "./SilverbacksNFT.sol";
 
 /**
  * SilverbacksVault:
- * - Handles deposits of stablecoins and mints batch NFTs accordingly.
+ * - Handles deposits of stablecoins and mints NFTs accordingly.
  * - Manages NFT redemption by burning NFTs and releasing locked stablecoins.
  *
  * NOTE on decimals:
  *   - The MyStableCoin is assumed to have 18 decimals (standard ERC-20).
- *   - Each "Silverback" NFT is notionally worth $100, so in base ERC-20 units,
- *     that is 100 * 10^18 = 100e18. We'll call this NOTE_SIZE.
- *   - We store the NFT's faceValue as just "100" (an integer) so the tests can
- *     compare to 100 directly. But when actually transferring stablecoins, we
- *     multiply that faceValue by 1e18 to handle decimals correctly.
+ *   - Each "Silverback" NFT is notionally worth $100, i.e. 100 * 10^18.
+ *     We call this value NOTE_SIZE.
+ *   - The NFT’s faceValue is stored as “100” (no decimals). When transferring
+ *     stablecoins the faceValue is multiplied by 1e18.
  *
- * Now the deposit function accepts an extra string parameter `metadataURI`
- * which is passed on to each NFT minted.
+ * New Functions Added:
+ *   - depositTo: Deposits stablecoins (from the caller) and mints an NFT
+ *     to a specified recipient. (Only accepts exactly a $100 deposit.)
+ *   - batchDeposit: Processes an array of recipients and corresponding metadata
+ *     URIs. Each entry is treated as a deposit of exactly $100.
  */
 contract SilverbacksVault is Ownable {
     // The underlying stablecoin contract (assumed 18 decimals).
@@ -29,10 +31,11 @@ contract SilverbacksVault is Ownable {
     SilverbacksNFT public silverbacksNFT;
     // Next token ID to use when minting new NFTs.
     uint256 public nextTokenId;
-    // Each "silverback" represents $100 in stableCoin, i.e. 100 * 1e18 base units.
+    // Each "silverback" represents $100 in stableCoin (i.e. 100 * 1e18).
     uint256 private constant NOTE_SIZE = 100 * 10**18;
 
     event Deposited(address indexed depositor, uint256 depositAmount, uint256 mintedCount, uint256 remainder);
+    event BatchDeposited(address indexed depositor, uint256 totalAmount, uint256 mintedCount);
     event Redeemed(address indexed redeemer, uint256 tokenId, uint256 faceValue);
 
     constructor(address _stableCoin, address _silverbacksNFT) {
@@ -43,41 +46,38 @@ contract SilverbacksVault is Ownable {
 
     /**
      * Deposit stablecoins in multiples of $100 along with a metadata URI.
-     * If depositAmount is not a multiple of $100 * 1e18, the remainder is refunded.
-     * The provided metadataURI is stored in each NFT minted.
+     * If depositAmount is not a multiple of NOTE_SIZE, the remainder is refunded.
+     * NFTs are minted to msg.sender.
      */
     function deposit(uint256 depositAmount, string memory metadataURI) external {
         console.log("SilverbacksVault.deposit called by: %s", msg.sender);
-        console.log("Deposit amount: %s base units (i.e. 1e18 = 1 token)", depositAmount);
+        console.log("Deposit amount: %s base units", depositAmount);
 
         require(depositAmount >= NOTE_SIZE, "Minimum deposit is $100 worth of tokens");
 
-        // 1. Transfer stablecoins from user to this contract.
+        // Transfer stablecoins from the caller to this contract.
         require(
             stableCoin.transferFrom(msg.sender, address(this), depositAmount),
             "Transfer failed"
         );
 
-        // 2. Calculate how many full $100 notes we can mint.
+        // Calculate full $100 notes and refund any remainder.
         uint256 numFullNotes = depositAmount / NOTE_SIZE;
         uint256 remainder    = depositAmount % NOTE_SIZE;
 
-        // 3. Refund any remainder.
         if (remainder > 0) {
-            console.log("Refunding remainder: %s base units", remainder);
+            console.log("Refunding remainder: %s", remainder);
             require(
                 stableCoin.transfer(msg.sender, remainder),
                 "Refund transfer failed"
             );
         }
 
-        // 4. Mint an NFT for each full $100.
+        // Mint an NFT for each full $100.
         for (uint256 i = 0; i < numFullNotes; i++) {
             uint256 tokenId = nextTokenId;
             nextTokenId++;
             console.log("Minting NFT with tokenId: %s for depositor: %s", tokenId, msg.sender);
-
-            // The NFT's faceValue is stored as "100" (no decimals).
             silverbacksNFT.mintNote(msg.sender, tokenId, 100, metadataURI);
         }
 
@@ -85,23 +85,81 @@ contract SilverbacksVault is Ownable {
     }
 
     /**
-     * Redeem an NFT for stablecoins. The NFT must belong to the caller.
-     * Burns the NFT and transfers the corresponding stablecoins.
+     * depositTo:
+     * Deposits stablecoins (from the caller) and mints an NFT to a specified recipient.
+     * The depositAmount must be at least $100, and for simplicity, this function
+     * accepts exactly a $100 deposit. Any excess is refunded.
+     */
+    function depositTo(address recipient, uint256 depositAmount, string memory metadataURI) external {
+        console.log("SilverbacksVault.depositTo called by: %s, recipient: %s", msg.sender, recipient);
+        require(depositAmount >= NOTE_SIZE, "Minimum deposit is $100 worth of tokens");
+
+        require(
+            stableCoin.transferFrom(msg.sender, address(this), depositAmount),
+            "Transfer failed"
+        );
+
+        uint256 numFullNotes = depositAmount / NOTE_SIZE;
+        uint256 remainder    = depositAmount % NOTE_SIZE;
+
+        if (remainder > 0) {
+            console.log("Refunding remainder: %s", remainder);
+            require(
+                stableCoin.transfer(msg.sender, remainder),
+                "Refund transfer failed"
+            );
+        }
+
+        // For depositTo we require exactly one NFT minted per call.
+        require(numFullNotes == 1, "depositTo accepts exactly a $100 deposit");
+        uint256 tokenId = nextTokenId;
+        nextTokenId++;
+        silverbacksNFT.mintNote(recipient, tokenId, 100, metadataURI);
+
+        emit Deposited(recipient, depositAmount, 1, remainder);
+    }
+
+    /**
+     * batchDeposit:
+     * Batch deposits for minting NFTs to multiple recipients.
+     * Each entry in the arrays represents a deposit of exactly $100.
+     * The caller must have approved (NOTE_SIZE * recipients.length) stablecoins.
+     * Arrays `recipients` and `metadataURIs` must be the same length.
+     */
+    function batchDeposit(address[] calldata recipients, string[] calldata metadataURIs) external {
+        require(recipients.length == metadataURIs.length, "Array length mismatch");
+        uint256 count = recipients.length;
+        uint256 totalRequired = count * NOTE_SIZE;
+        require(
+            stableCoin.transferFrom(msg.sender, address(this), totalRequired),
+            "Transfer failed"
+        );
+
+        for (uint256 i = 0; i < count; i++) {
+            silverbacksNFT.mintNote(recipients[i], nextTokenId, 100, metadataURIs[i]);
+            nextTokenId++;
+        }
+
+        emit BatchDeposited(msg.sender, totalRequired, count);
+    }
+
+    /**
+     * Redeem:
+     * Burns an NFT owned by the caller and returns the corresponding stablecoins.
      */
     function redeem(uint256 tokenId) external {
         console.log("SilverbacksVault.redeem called by: %s for tokenId: %s", msg.sender, tokenId);
 
-        // 1. Verify the caller owns the NFT.
+        // Verify NFT ownership.
         require(silverbacksNFT.ownerOf(tokenId) == msg.sender, "Not NFT owner");
 
-        // 2. Look up the integer faceValue in the NFT (e.g., 100).
         uint256 nominalValue = silverbacksNFT.faceValue(tokenId);
-        console.log("Redeeming NFT with faceValue: %s (in 'whole tokens')", nominalValue);
+        console.log("Redeeming NFT with faceValue: %s", nominalValue);
 
-        // 3. Burn the NFT.
+        // Burn the NFT.
         silverbacksNFT.burn(tokenId);
 
-        // 4. Transfer the stablecoins. Multiply by 1e18 since nominalValue=100 => 100 * 1e18.
+        // Transfer the stablecoins (multiply by 1e18).
         uint256 actualAmount = nominalValue * 10**18;
         require(
             stableCoin.transfer(msg.sender, actualAmount),

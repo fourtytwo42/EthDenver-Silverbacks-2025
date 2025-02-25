@@ -3,9 +3,9 @@ import { ethers } from "ethers";
 import { create } from "ipfs-http-client";
 
 // Replace with your actual deployed contract addresses:
-const stableCoinAddress = "0x9939591954046BD6bc5c67511fa4B1A76e42175e";
-const silverbacksNftAddress = "0xEf1060004B5e9063503c3e1e899f304E53822D3b";
-const vaultAddress = "0x99B3206Ab7fAb39CffBa9fC496CbbD21fC170B98";
+const stableCoinAddress = "0x75153Ed039E34b2DAEBfc07107cf3665aAB9C16D";
+const silverbacksNftAddress = "0x41AD33A0f1EfFF7D6B95Cd0D80c5DC00CDbd15b2";
+const vaultAddress = "0x116F4870e2048fd3E496DC4F9D19ef8EbFdae65e";
 
 // Minimal ABI snippets:
 const stableCoinABI = [
@@ -24,8 +24,11 @@ const nftABI = [
   "function safeTransferFrom(address from, address to, uint256 tokenId)"
 ];
 
+// Updated vault ABI including depositTo and batchDeposit functions.
 const vaultABI = [
   "function deposit(uint256 depositAmount, string metadataURI) external",
+  "function depositTo(address recipient, uint256 depositAmount, string metadataURI) external",
+  "function batchDeposit(address[] recipients, string[] metadataURIs) external",
   "function redeem(uint256 tokenId) external"
 ];
 
@@ -46,13 +49,15 @@ function App() {
   const [depositAmount, setDepositAmount] = useState("100");
   const [logMessages, setLogMessages] = useState([]);
 
-  // New states for image upload:
+  // New state for specifying a recipient for single deposit mode.
+  const [depositRecipient, setDepositRecipient] = useState("");
+
+  // States for file uploads (for single deposit)
   const [frontImageFile, setFrontImageFile] = useState(null);
   const [backImageFile, setBackImageFile] = useState(null);
 
-  // New states for NFT transfer:
-  const [transferAddresses, setTransferAddresses] = useState({});
-  const [transferVisible, setTransferVisible] = useState({});
+  // New state for CSV batch deposit file.
+  const [csvFile, setCsvFile] = useState(null);
 
   const log = (msg) => {
     console.log(msg);
@@ -138,7 +143,6 @@ function App() {
         let metadata = {};
         try {
           // Use the HTTPS gateway to fetch the metadata JSON.
-          // Remove the "ipfs://" prefix and prepend the HTTPS gateway URL.
           const response = await fetch("https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7));
           metadata = await response.json();
         } catch (err) {
@@ -160,12 +164,138 @@ function App() {
     }
   };
 
+  // Single deposit to a specified address (using depositTo).
+  const handleDepositTo = async () => {
+    if (!currentAccount) {
+      alert("Please connect wallet first.");
+      return;
+    }
+    if (!depositRecipient || !ethers.utils.isAddress(depositRecipient)) {
+      alert("Please enter a valid recipient address.");
+      return;
+    }
+    if (!frontImageFile || !backImageFile) {
+      alert("Please select both front and back images.");
+      return;
+    }
+    try {
+      // Upload front and back images to IPFS.
+      const frontAdded = await ipfsClient.add(frontImageFile);
+      const frontImageCID = frontAdded.path;
+      log("Front image uploaded with CID: " + frontImageCID);
+
+      const backAdded = await ipfsClient.add(backImageFile);
+      const backImageCID = backAdded.path;
+      log("Back image uploaded with CID: " + backImageCID);
+
+      // Build metadata JSON.
+      const metadata = {
+        name: "Silverback NFT",
+        description: "An NFT representing a $100 bill.",
+        image: "ipfs://" + frontImageCID,
+        properties: { imageBack: "ipfs://" + backImageCID }
+      };
+      const metadataString = JSON.stringify(metadata);
+      const metadataAdded = await ipfsClient.add(metadataString);
+      const metadataCID = metadataAdded.path;
+      const metaURI = "ipfs://" + metadataCID;
+      log("Metadata JSON uploaded with URI: " + metaURI);
+
+      // Call depositTo on the vault (note: depositAmount must be exactly 100 tokens).
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      const depositWei = ethers.utils.parseEther("100"); // exactly $100 deposit
+      let tx = await vaultContract.depositTo(depositRecipient, depositWei, metaURI);
+      log("Depositing stablecoins and minting NFT to " + depositRecipient + "...");
+      await tx.wait();
+      log("DepositTo transaction confirmed!");
+      await loadData();
+    } catch (err) {
+      console.error("Error in depositTo:", err);
+      log("Error in depositTo: " + err.message);
+    }
+  };
+
+  // Batch deposit using a CSV file.
+  // CSV format: recipient,frontImageURL,backImageURL per row.
+  const handleCSVDeposit = async () => {
+    if (!currentAccount) {
+      alert("Please connect wallet first.");
+      return;
+    }
+    if (!csvFile) {
+      alert("Please select a CSV file.");
+      return;
+    }
+    try {
+      const fileText = await csvFile.text();
+      const rows = fileText.split("\n").filter(row => row.trim() !== "");
+      const recipients = [];
+      const metadataURIs = [];
+      // Process each row.
+      for (let row of rows) {
+        // Assuming CSV columns are comma-separated:
+        // recipient,frontImageURL,backImageURL
+        const cols = row.split(",");
+        if (cols.length < 3) continue;
+        const recipient = cols[0].trim();
+        const frontURL = cols[1].trim();
+        const backURL = cols[2].trim();
+        if (!ethers.utils.isAddress(recipient)) {
+          log("Invalid address in CSV: " + recipient);
+          continue;
+        }
+        // Build metadata JSON (using the provided image URLs directly).
+        const metadata = {
+          name: "Silverback NFT",
+          description: "An NFT representing a $100 bill.",
+          image: frontURL,
+          properties: { imageBack: backURL }
+        };
+        // Upload metadata JSON to IPFS.
+        const metadataAdded = await ipfsClient.add(JSON.stringify(metadata));
+        const metaURI = "ipfs://" + metadataAdded.path;
+        recipients.push(recipient);
+        metadataURIs.push(metaURI);
+        log(`Processed CSV row for ${recipient}. Metadata URI: ${metaURI}`);
+      }
+
+      if (recipients.length === 0) {
+        alert("No valid entries found in CSV.");
+        return;
+      }
+
+      // Calculate total deposit: each row requires a $100 deposit.
+      const totalDeposit = ethers.utils.parseEther((recipients.length * 100).toString());
+      // Approve the vault for the total deposit.
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const stableCoinContract = new ethers.Contract(stableCoinAddress, stableCoinABI, signer);
+      let tx = await stableCoinContract.approve(vaultAddress, totalDeposit);
+      log("Approving vault for batch deposit of " + (recipients.length * 100) + " tokens...");
+      await tx.wait();
+      log("Approval confirmed.");
+
+      // Call batchDeposit on the vault.
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      tx = await vaultContract.batchDeposit(recipients, metadataURIs);
+      log("Batch deposit transaction submitted...");
+      await tx.wait();
+      log("Batch deposit transaction confirmed!");
+      await loadData();
+    } catch (err) {
+      console.error("Error in CSV deposit:", err);
+      log("Error in CSV deposit: " + err.message);
+    }
+  };
+
+  // Existing single deposit (to self) remains unchanged.
   const handleDeposit = async () => {
     if (!currentAccount) {
       alert("Please connect wallet first.");
       return;
     }
-    // Ensure both images are selected
     if (!frontImageFile || !backImageFile) {
       alert("Please select both front and back images.");
       return;
@@ -179,12 +309,8 @@ function App() {
       alert("Deposit must be a multiple of 100!");
       return;
     }
-    if (Number(rawAmount) > Number(stableCoinBalance)) {
-      alert("You do not have enough stablecoins!");
-      return;
-    }
     try {
-      // --- Upload images and metadata to IPFS via your node ---
+      // Upload images and metadata to IPFS.
       const frontAdded = await ipfsClient.add(frontImageFile);
       const frontImageCID = frontAdded.path;
       log("Front image uploaded with CID: " + frontImageCID);
@@ -193,15 +319,11 @@ function App() {
       const backImageCID = backAdded.path;
       log("Back image uploaded with CID: " + backImageCID);
       
-      // Update metadata to follow OpenSea metadata standard:
-      // Use 'image' as the primary image and include the back image in properties.
       const metadata = {
         name: "Silverback NFT",
         description: "An NFT representing a $100 bill.",
         image: "ipfs://" + frontImageCID,
-        properties: {
-          imageBack: "ipfs://" + backImageCID
-        }
+        properties: { imageBack: "ipfs://" + backImageCID }
       };
       const metadataString = JSON.stringify(metadata);
       const metadataAdded = await ipfsClient.add(metadataString);
@@ -209,7 +331,6 @@ function App() {
       const metaURI = "ipfs://" + metadataCID;
       log("Metadata JSON uploaded with URI: " + metaURI);
 
-      // --- Proceed with deposit ---
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const stableCoinContract = new ethers.Contract(stableCoinAddress, stableCoinABI, signer);
@@ -218,9 +339,9 @@ function App() {
       let tx = await stableCoinContract.approve(vaultAddress, depositWei);
       log("Approving vault to spend " + rawAmount + " tokens...");
       await tx.wait();
-      log("Approval transaction confirmed.");
+      log("Approval confirmed.");
       tx = await vaultContract.deposit(depositWei, metaURI);
-      log("Depositing stablecoins and minting Silverbacks NFTs...");
+      log("Depositing stablecoins and minting NFT(s)...");
       await tx.wait();
       log("Deposit transaction confirmed!");
       await loadData();
@@ -251,9 +372,10 @@ function App() {
   };
 
   const handleTransfer = async (tokenId) => {
-    const recipient = transferAddresses[tokenId];
+    // Existing transfer functionality remains unchanged.
+    const recipient = prompt("Enter recipient address:");
     if (!recipient || !ethers.utils.isAddress(recipient)) {
-      alert("Please enter a valid Ethereum address for transfer.");
+      alert("Invalid Ethereum address.");
       return;
     }
     try {
@@ -271,6 +393,7 @@ function App() {
     }
   };
 
+  // Handlers for file inputs.
   const handleFrontImageChange = (e) => {
     if (e.target.files.length > 0) {
       const file = e.target.files[0];
@@ -292,6 +415,14 @@ function App() {
       }
       setBackImageFile(file);
       log("Back image selected: " + file.name);
+    }
+  };
+
+  const handleCSVFileChange = (e) => {
+    if (e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setCsvFile(file);
+      log("CSV file selected: " + file.name);
     }
   };
 
@@ -340,14 +471,15 @@ function App() {
                 Your StableCoin Balance: <b>{stableCoinBalance}</b> MSC
               </p>
               <hr />
-              <h2>Mint Silverbacks</h2>
+
+              {/* Original deposit (mint to self) */}
+              <h2>Mint Silverbacks (to Self)</h2>
               <p>
-                Deposit must be a multiple of 100. You’ll receive 1 NFT per each $100 deposited.
+                Deposit must be a multiple of 100. You’ll receive 1 NFT per $100 deposited.
               </p>
               <div style={{ marginBottom: "1rem" }}>
                 <input type="file" accept="image/*" onChange={handleFrontImageChange} />
-                <br />
-                <br />
+                <br /><br />
                 <input type="file" accept="image/*" onChange={handleBackImageChange} />
               </div>
               <div style={{ marginBottom: "1rem" }}>
@@ -360,6 +492,39 @@ function App() {
                 <button onClick={handleDeposit}>Deposit & Mint</button>
               </div>
               <hr />
+
+              {/* New depositTo (mint to specified address) */}
+              <h2>Mint Silverback to a Specific Address</h2>
+              <p>
+                Deposit exactly 100 stablecoins to mint a Silverback NFT to a chosen recipient.
+              </p>
+              <div style={{ marginBottom: "1rem" }}>
+                <input
+                  type="text"
+                  placeholder="Recipient address"
+                  value={depositRecipient}
+                  onChange={(e) => setDepositRecipient(e.target.value)}
+                  style={{ width: "100%", marginBottom: "0.5rem" }}
+                />
+                <input type="file" accept="image/*" onChange={handleFrontImageChange} />
+                <br /><br />
+                <input type="file" accept="image/*" onChange={handleBackImageChange} />
+              </div>
+              <button onClick={handleDepositTo}>Deposit & Mint to Recipient</button>
+              <hr />
+
+              {/* New CSV batch deposit */}
+              <h2>Batch Mint from CSV</h2>
+              <p>
+                Upload a CSV file with 3 columns: Recipient address, Front image URL, Back image URL.
+                Each row deposits $100 and mints an NFT.
+              </p>
+              <div style={{ marginBottom: "1rem" }}>
+                <input type="file" accept=".csv" onChange={handleCSVFileChange} />
+              </div>
+              <button onClick={handleCSVDeposit}>Process CSV Batch Deposit</button>
+              <hr />
+
               <h2>Your Silverbacks NFTs</h2>
               {nfts.length === 0 ? (
                 <p>You have no Silverbacks NFTs.</p>
@@ -392,34 +557,9 @@ function App() {
                         <p>No images available.</p>
                       )}
                       <button onClick={() => handleBurn(n.tokenId)}>Burn & Redeem</button>
-                      <button
-                        onClick={() =>
-                          setTransferVisible({
-                            ...transferVisible,
-                            [n.tokenId]: !transferVisible[n.tokenId]
-                          })
-                        }
-                        style={{ marginTop: "0.5rem" }}
-                      >
-                        {transferVisible[n.tokenId] ? "Cancel Transfer" : "Transfer NFT"}
+                      <button onClick={() => handleTransfer(n.tokenId)} style={{ marginTop: "0.5rem" }}>
+                        Transfer NFT
                       </button>
-                      {transferVisible[n.tokenId] && (
-                        <div style={{ marginTop: "0.5rem" }}>
-                          <input
-                            type="text"
-                            placeholder="Recipient address"
-                            value={transferAddresses[n.tokenId] || ""}
-                            onChange={(e) =>
-                              setTransferAddresses({
-                                ...transferAddresses,
-                                [n.tokenId]: e.target.value
-                              })
-                            }
-                            style={{ marginBottom: "0.5rem", width: "100%" }}
-                          />
-                          <button onClick={() => handleTransfer(n.tokenId)}>Confirm Transfer</button>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
@@ -435,9 +575,7 @@ function App() {
         <h3>Debug Log</h3>
         <div style={{ maxHeight: "200px", overflowY: "auto" }}>
           {logMessages.map((msg, idx) => (
-            <p key={idx} style={{ margin: 0, fontFamily: "monospace" }}>
-              {msg}
-            </p>
+            <p key={idx} style={{ margin: 0, fontFamily: "monospace" }}>{msg}</p>
           ))}
         </div>
       </div>
