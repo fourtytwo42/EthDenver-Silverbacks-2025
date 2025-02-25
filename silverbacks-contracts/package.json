@@ -1,0 +1,22 @@
+{
+  "name": "silverbacks-project",
+  "version": "1.0.0",
+  "description": "A minimal Hardhat project for Silverbacks: ERC20 stablecoin, ERC721 for bills, and a main vault contract.",
+  "scripts": {
+    "build": "npx hardhat compile",
+    "test": "npx hardhat test",
+    "deploy:sepolia": "npx hardhat run scripts/deploy.js --network sepolia",
+    "deploy:linea": "npx hardhat run scripts/deploy.js --network linea"
+  },
+  "dependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.2.2",
+    "@openzeppelin/contracts": "^4.8.3",
+    "dotenv": "^16.0.3",
+    "ethers": "^5.7.2",
+    "hardhat": "^2.12.7"
+  },
+  "devDependencies": {
+    "chai": "^4.3.7",
+    "mocha": "^10.2.0"
+  }
+}

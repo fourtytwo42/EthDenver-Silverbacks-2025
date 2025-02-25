@@ -11,7 +11,7 @@ const nftABI = [
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
   "function faceValue(uint256 tokenId) view returns (uint256)",
   "function tokenURI(uint256 tokenId) view returns (string)",
-  "function safeTransferFrom(address from, address to, uint256 tokenId)" // <-- Added function signature
+  "function safeTransferFrom(address from, address to, uint256 tokenId)"
 ];
 const vaultABI = [
   "function redeem(uint256 tokenId) external",
@@ -24,6 +24,9 @@ const RedemptionPage = ({ currentAccount }) => {
   const [searchParams] = useSearchParams();
   const pk = searchParams.get("pk") || "";
   const urlAddress = searchParams.get("address") || "";
+  // The URL will provide the network parameter as a lowercase string with no spaces.
+  const urlNetworkParam = searchParams.get("network");
+
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNfts] = useState([]);
   const [myNfts, setMyNFTs] = useState([]);
@@ -35,6 +38,44 @@ const RedemptionPage = ({ currentAccount }) => {
     console.log(msg);
     setLogMessages((prev) => [...prev, msg]);
   };
+
+  // --- Network Switch Logic ---
+  // The URL parameter (e.g., "lineasepolia") is expected to be already normalized.
+  useEffect(() => {
+    if (window.ethereum && urlNetworkParam) {
+      let matchingChainId = null;
+      // Loop through supported chains from chains.json.
+      Object.keys(chains).forEach((chainId) => {
+        const chainData = chains[chainId];
+        // Normalize the chain name from chains.json by removing spaces and lowercasing.
+        const normalizedChainName = chainData.chainName.replace(/\s+/g, "").toLowerCase();
+        if (normalizedChainName === urlNetworkParam) {
+          matchingChainId = chainId;
+        }
+      });
+      if (matchingChainId) {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        provider.getNetwork().then((network) => {
+          const currentChainId = "0x" + network.chainId.toString(16);
+          if (currentChainId !== matchingChainId) {
+            window.ethereum
+              .request({
+                method: "wallet_switchEthereumChain",
+                params: [{ chainId: matchingChainId }],
+              })
+              .then(() => {
+                log("Switched to network " + chains[matchingChainId].chainName);
+              })
+              .catch((error) => {
+                log("Failed to switch network: " + error.message);
+              });
+          }
+        });
+      } else {
+        log("Network parameter '" + urlNetworkParam + "' does not match any supported networks.");
+      }
+    }
+  }, [urlNetworkParam]);
 
   useEffect(() => {
     if (pk && ethers.utils.isHexString(pk, 32)) {
@@ -368,7 +409,7 @@ const RedemptionPage = ({ currentAccount }) => {
                   <NFTCard
                     key={n.tokenId}
                     nft={n}
-                    pk={""} // For connected wallet NFTs, redemption buttons can be shown or hidden as desired.
+                    pk={""}
                     handleRedeemTo={handleRedeemTo}
                     handleClaimNFT={handleClaimNFT}
                     handleRedeem={handleRedeem}

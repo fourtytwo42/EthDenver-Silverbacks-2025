@@ -1,0 +1,42 @@
+{
+  "0xaa36a7": {
+    "chainId": "0xaa36a7",
+    "chainName": "Sepolia Test Network",
+    "rpcUrls": [
+      "https://rpc.sepolia.org"
+    ],
+    "blockExplorerUrls": [
+      "https://sepolia.etherscan.io"
+    ],
+    "nativeCurrency": {
+      "name": "SepoliaETH",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "contracts": {
+      "stableCoin": "0xfED1D0836004e47a30C93aa5E3eD7735B977a2eb",
+      "silverbacksNFT": "0xEb641123243b897201B7E1fB2052256B6E9e1f5a",
+      "vault": "0x2A314860Cc789D30E384369769e2C85b67939689"
+    }
+  },
+  "0xe705": {
+    "chainId": "0xe705",
+    "chainName": "Linea Sepolia",
+    "rpcUrls": [
+      "https://linea-sepolia.infura.io"
+    ],
+    "blockExplorerUrls": [
+      "https://sepolia.lineascan.build"
+    ],
+    "nativeCurrency": {
+      "name": "LineaETH",
+      "symbol": "LineaETH",
+      "decimals": 18
+    },
+    "contracts": {
+      "stableCoin": "0x0CD9CB83CA1aEF7a25FCa0fd1Bfa0095F9AF8b50",
+      "silverbacksNFT": "0xa6E9F009959714E924E097fAeC79EC09C0A7Be15",
+      "vault": "0x3F29e934a7294887A461cbB07591f523F2cb652F"
+    }
+  }
+}
