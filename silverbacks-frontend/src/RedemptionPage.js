@@ -13,7 +13,9 @@ const nftABI = [
   "function faceValue(uint256 tokenId) view returns (uint256)",
   "function tokenURI(uint256 tokenId) view returns (string)"
 ];
+// Updated vault ABI now includes the redeem() function for direct claims.
 const vaultABI = [
+  "function redeem(uint256 tokenId) external",
   "function redeemWithAuth(uint256 tokenId, bytes signature) external",
   "function redeemTo(uint256 tokenId, bytes signature) external",
   "function claimNFT(uint256 tokenId, bytes signature) external"
@@ -23,14 +25,14 @@ const RedemptionPage = ({ currentAccount }) => {
   const [searchParams] = useSearchParams();
   const pk = searchParams.get("pk") || "";
   const urlAddress = searchParams.get("address") || "";
-  
-  // For redemption tokens (from URL parameter)
+
+  // For redemption NFTs (from URL parameter)
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNfts] = useState([]);
-  
+
   // For connected wallet NFTs
-  const [myNfts, setMyNfts] = useState([]);
-  
+  const [myNfts, setMyNFTs] = useState([]);
+
   const [logMessages, setLogMessages] = useState([]);
   const [contractAddresses, setContractAddresses] = useState(null);
   const [erc20Balance, setErc20Balance] = useState(null);
@@ -58,7 +60,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [pk, urlAddress]);
 
-  // Load contract addresses dynamically
+  // Load contract addresses dynamically.
   useEffect(() => {
     async function loadContractAddresses() {
       if (window.ethereum) {
@@ -80,7 +82,7 @@ const RedemptionPage = ({ currentAccount }) => {
     loadContractAddresses();
   }, []);
 
-  // Load ERC20 balance of the connected wallet
+  // Load ERC20 balance of the connected wallet.
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
     try {
@@ -145,7 +147,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [ownerAddress, contractAddresses]);
 
-  // Load NFTs for the connected wallet (currentAccount)
+  // Load NFTs for the connected wallet.
   const loadMyNFTs = async () => {
     if (!currentAccount || !window.ethereum || !contractAddresses) return;
     try {
@@ -175,7 +177,7 @@ const RedemptionPage = ({ currentAccount }) => {
           description: metadata.description || ""
         });
       }
-      setMyNfts(nftData);
+      setMyNFTs(nftData);
       if (nftData.length === 0) {
         log("No NFTs found for connected wallet " + currentAccount);
       }
@@ -190,7 +192,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // Redeem functions remain unchanged
+  // Redeem functions for NFTs that require a signature (for addresses provided via URL)
   const handleRedeemTo = async (tokenId) => {
     if (!currentAccount) {
       alert("Please connect your wallet using the header.");
@@ -244,6 +246,53 @@ const RedemptionPage = ({ currentAccount }) => {
       loadRedeemNFTs();
     } catch (error) {
       log("Error during claimNFT: " + error.message);
+    }
+  };
+
+  // NEW FUNCTION: Allow connected wallet NFT owners to redeem (burn) their NFT and claim the attached stablecoins.
+  const handleRedeem = async (tokenId) => {
+    if (!currentAccount) {
+      alert("Please connect your wallet using the header.");
+      return;
+    }
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
+      log("Redeeming NFT tokenId " + tokenId + " for stablecoins...");
+      const tx = await vaultContract.redeem(tokenId);
+      await tx.wait();
+      log("Redeem transaction confirmed for tokenId " + tokenId);
+      // Refresh NFT data and ERC20 balance
+      loadMyNFTs();
+      loadERC20Balance();
+    } catch (error) {
+      log("Error during redeem: " + error.message);
+    }
+  };
+
+  // NEW FUNCTION: Allow sending (transferring) an NFT from the connected wallet.
+  const handleSendNFT = async (tokenId) => {
+    if (!currentAccount) {
+      alert("Please connect your wallet using the header.");
+      return;
+    }
+    const recipient = prompt("Enter recipient address:");
+    if (!recipient || !ethers.utils.isAddress(recipient)) {
+      alert("Invalid Ethereum address.");
+      return;
+    }
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, signer);
+      log("Transferring NFT tokenId " + tokenId + " to " + recipient + "...");
+      const tx = await nftContract["safeTransferFrom(address,address,uint256)"](currentAccount, recipient, tokenId);
+      await tx.wait();
+      log("Transfer transaction confirmed for tokenId " + tokenId);
+      loadMyNFTs();
+    } catch (err) {
+      log("Error transferring NFT: " + err.message);
     }
   };
 
@@ -303,10 +352,7 @@ const RedemptionPage = ({ currentAccount }) => {
                       <button onClick={() => handleRedeemTo(n.tokenId)} style={actionButtonStyle}>
                         Redeem for Stablecoin
                       </button>
-                      <button
-                        onClick={() => handleClaimNFT(n.tokenId)}
-                        style={{ ...actionButtonStyle, marginTop: "0.5rem" }}
-                      >
+                      <button onClick={() => handleClaimNFT(n.tokenId)} style={{ ...actionButtonStyle, marginTop: "0.5rem" }}>
                         Claim NFT
                       </button>
                     </>
@@ -356,6 +402,12 @@ const RedemptionPage = ({ currentAccount }) => {
                   ) : (
                     <p>No images available.</p>
                   )}
+                  <button onClick={() => handleRedeem(n.tokenId)} style={actionButtonStyle}>
+                    Redeem NFT
+                  </button>
+                  <button onClick={() => handleSendNFT(n.tokenId)} style={{ ...actionButtonStyle, marginTop: "0.5rem" }}>
+                    Send NFT
+                  </button>
                 </div>
               ))}
             </div>
