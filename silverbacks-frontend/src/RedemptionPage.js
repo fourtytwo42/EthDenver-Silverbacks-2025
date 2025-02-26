@@ -40,17 +40,26 @@ const RedemptionPage = ({ currentAccount }) => {
   // Determine if on a mobile device for styling purposes.
   const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
-  // Define style for the QR scanner modal.
-  const scannerModalStyle = {
+  // Full-screen modal container to center the QR scanner.
+  const modalContainerStyle = {
     position: "fixed",
-    top: isMobile ? "50%" : "20%",
-    left: "50%",
-    transform: isMobile ? "translate(-50%, -50%)" : "translateX(-50%)",
+    top: 0,
+    left: 0,
+    width: "100%",
+    height: "100%",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    zIndex: 1000
+  };
+
+  // The modal box that contains the scanner (fixed width)
+  const scannerModalStyle = {
     width: "320px",
     backgroundColor: "rgba(0,0,0,0.9)",
     padding: "1rem",
     borderRadius: "8px",
-    zIndex: 1000,
     textAlign: "center"
   };
 
@@ -85,8 +94,8 @@ const RedemptionPage = ({ currentAccount }) => {
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
-  // Ref to ensure we request camera permission only once.
-  const cameraPermissionRequested = useRef(false);
+  // New state to track if camera permission has been granted (only request once)
+  const [hasCameraPermission, setHasCameraPermission] = useState(false);
 
   // Logging helper with timestamp
   const log = (msg) => {
@@ -300,20 +309,20 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // 6) When scanning starts, enumerate available video devices (only request camera permission once)
+  // 6) When scanning starts, request camera permission only once and then enumerate devices.
   useEffect(() => {
-    if (scanning && !cameraPermissionRequested.current) {
-      (async () => {
-        try {
-          await navigator.mediaDevices.getUserMedia({ video: true });
-          cameraPermissionRequested.current = true;
-        } catch (err) {
-          log(`Error requesting camera permission: ${err.message}`);
-        }
-      })();
-    }
     if (scanning) {
-      (async function enumerateDevices() {
+      const requestPermissionAndEnumerate = async () => {
+        if (!hasCameraPermission) {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            setHasCameraPermission(true);
+            // Stop all tracks from the stream since we only need the permission.
+            stream.getTracks().forEach(track => track.stop());
+          } catch (err) {
+            log(`Error requesting camera permission: ${err.message}`);
+          }
+        }
         try {
           const devices = await navigator.mediaDevices.enumerateDevices();
           const videoInputs = devices.filter((d) => d.kind === "videoinput");
@@ -330,10 +339,11 @@ const RedemptionPage = ({ currentAccount }) => {
         } catch (err) {
           log(`Error enumerating video devices: ${err.message}`);
         }
-      })();
-      setStopStream(false);
+        setStopStream(false);
+      };
+      requestPermissionAndEnumerate();
     }
-  }, [scanning]);
+  }, [scanning, hasCameraPermission]);
 
   // 7) Initiate an action (for ephemeral NFTs) by opening the QR scanner
   const initiateAction = (tokenId, action) => {
@@ -542,62 +552,64 @@ const RedemptionPage = ({ currentAccount }) => {
 
       {/* QR Code Scanner Modal */}
       {scanning && (
-        <div style={scannerModalStyle}>
-          <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
-            Please scan ephemeral key's QR code
-          </h4>
-          <BarcodeScannerComponent
-            delay={100} // Reduced delay for faster QR code detection
-            width={300}
-            height={300}
-            stopStream={stopStream}
-            videoConstraints={
-              selectedDeviceId
-                ? { deviceId: { exact: selectedDeviceId } }
-                : { facingMode: "environment" }
-            }
-            onUpdate={handleScan}
-          />
-          {/* Button to cycle through available cameras if more than one exists */}
-          {videoDevices.length > 1 && (
+        <div style={modalContainerStyle}>
+          <div style={scannerModalStyle}>
+            <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
+              Please scan ephemeral key's QR code
+            </h4>
+            <BarcodeScannerComponent
+              delay={100} // Reduced delay for faster QR code detection
+              width={300}
+              height={300}
+              stopStream={stopStream}
+              videoConstraints={
+                selectedDeviceId
+                  ? { deviceId: { exact: selectedDeviceId } }
+                  : { facingMode: "environment" }
+              }
+              onUpdate={handleScan}
+            />
+            {/* Button to cycle through available cameras if more than one exists */}
+            {videoDevices.length > 1 && (
+              <button
+                style={{
+                  marginTop: "0.5rem",
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "#555",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer"
+                }}
+                onClick={() => {
+                  const nextIndex = (selectedCameraIndex + 1) % videoDevices.length;
+                  setSelectedCameraIndex(nextIndex);
+                  setSelectedDeviceId(videoDevices[nextIndex].deviceId);
+                  log(`Switching to camera: ${videoDevices[nextIndex].label || "unknown"}`);
+                }}
+              >
+                Switch Camera
+              </button>
+            )}
             <button
               style={{
                 marginTop: "0.5rem",
                 padding: "0.5rem 1rem",
-                backgroundColor: "#555",
+                backgroundColor: "#1976d2",
                 color: "#fff",
                 border: "none",
                 borderRadius: "4px",
                 cursor: "pointer"
               }}
               onClick={() => {
-                const nextIndex = (selectedCameraIndex + 1) % videoDevices.length;
-                setSelectedCameraIndex(nextIndex);
-                setSelectedDeviceId(videoDevices[nextIndex].deviceId);
-                log(`Switching to camera: ${videoDevices[nextIndex].label || "unknown"}`);
+                log("QR scanning cancelled by user");
+                setStopStream(true);
+                setScanning(false);
               }}
             >
-              Switch Camera
+              Cancel
             </button>
-          )}
-          <button
-            style={{
-              marginTop: "0.5rem",
-              padding: "0.5rem 1rem",
-              backgroundColor: "#1976d2",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer"
-            }}
-            onClick={() => {
-              log("QR scanning cancelled by user");
-              setStopStream(true);
-              setScanning(false);
-            }}
-          >
-            Cancel
-          </button>
+          </div>
         </div>
       )}
 
