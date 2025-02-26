@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import chains from "./chains.json";
 import NFTCard from "./NFTCard";
 import CryptoJS from "crypto-js";
-// Import and memoize the QrReader to avoid defaultProps warnings
+// Import and memoize QrReader to avoid defaultProps warnings
 import { QrReader } from "react-qr-reader";
 const MemoQrReader = memo(QrReader);
 
@@ -49,9 +49,10 @@ const RedemptionPage = ({ currentAccount }) => {
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
-  // New state for camera devices
+  // New state: video devices and the selected camera id
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
+  const [backCameraId, setBackCameraId] = useState(null);
 
   const previewStyle = {
     height: 300,
@@ -97,20 +98,26 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // Enumerate available video devices when the scanner is activated
+  // Enumerate available video devices when scanner is activated
   useEffect(() => {
     if (scanning) {
       async function getVideoDevices() {
         try {
-          // Request minimal access to get device labels if not already granted
+          // Request minimal access to ensure device labels are available
           await navigator.mediaDevices.getUserMedia({ video: true });
           const devices = await navigator.mediaDevices.enumerateDevices();
           const vids = devices.filter((device) => device.kind === "videoinput");
           setVideoDevices(vids);
-          // Set selected index to the one that includes 'back' or 'rear' in its label, if available
-          const backIndex = vids.findIndex((d) => /back|rear/i.test(d.label));
-          setSelectedCameraIndex(backIndex >= 0 ? backIndex : 0);
-          log(`Found ${vids.length} video devices; using device index ${backIndex >= 0 ? backIndex : 0}`);
+          if (vids.length > 0) {
+            // Prefer device with "back" or "rear" in its label if available
+            const backIndex = vids.findIndex((d) => /back|rear/i.test(d.label));
+            const indexToUse = backIndex >= 0 ? backIndex : 0;
+            setSelectedCameraIndex(indexToUse);
+            setBackCameraId(vids[indexToUse].deviceId);
+            log(`Found ${vids.length} video devices; using device index ${indexToUse} (${vids[indexToUse].label})`);
+          } else {
+            log("No video devices found.");
+          }
         } catch (err) {
           log(`Error enumerating video devices: ${err.message}`);
         }
@@ -447,7 +454,9 @@ const RedemptionPage = ({ currentAccount }) => {
           <div className="card-content">
             <span className="card-title">
               Redeeming NFTs for Ephemeral Address:{" "}
-              <code style={{ fontSize: "0.85em", fontFamily: "monospace" }}>{ownerAddress}</code>
+              <code style={{ fontSize: "0.85em", fontFamily: "monospace" }}>
+                {ownerAddress}
+              </code>
             </span>
             {redeemNfts.length > 0 ? (
               <div className="row">
@@ -528,7 +537,6 @@ const RedemptionPage = ({ currentAccount }) => {
                 log(`QR Reader error in onResult: ${error.message}`);
               }
             }}
-            // Use selected device if available; otherwise, fallback to forcing back camera
             constraints={{
               video: backCameraId
                 ? { deviceId: { exact: backCameraId } }
@@ -553,12 +561,10 @@ const RedemptionPage = ({ currentAccount }) => {
                 cursor: "pointer"
               }}
               onClick={() => {
-                // Cycle to the next camera
                 const nextIndex = (selectedCameraIndex + 1) % videoDevices.length;
                 setSelectedCameraIndex(nextIndex);
-                log(`Switching to camera: ${videoDevices[nextIndex].label || "unknown"}`);
-                // Update backCameraId state with the new device's id
                 setBackCameraId(videoDevices[nextIndex].deviceId);
+                log(`Switching to camera: ${videoDevices[nextIndex].label || "unknown"}`);
               }}
             >
               Switch Camera
