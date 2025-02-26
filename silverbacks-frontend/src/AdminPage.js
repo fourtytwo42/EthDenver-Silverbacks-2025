@@ -30,22 +30,7 @@ const vaultABI = [
   "function redeem(uint256 tokenId) external"
 ];
 
-// Create the IPFS client using your node's API endpoint.
-const ipfsClient = create({ url: "https://silverbacksipfs.online/api/v0" });
-
-// Define the list of tabs to show.
-const tabs = [
-  { id: "mintSelf", label: "Mint Self" },
-  { id: "mintRecipient", label: "Mint to Recipient" },
-  { id: "batchMint", label: "Batch Mint" },
-  { id: "nfts", label: "Your NFTs" },
-  { id: "debug", label: "Debug Log" },
-  { id: "generateKeys", label: "Generate Keys" },
-  { id: "testDecryption", label: "Test Decryption" }
-];
-
 const AdminPage = ({ currentAccount }) => {
-  // Deposit / NFT states
   const [depositAmount, setDepositAmount] = useState("100");
   const [depositRecipient, setDepositRecipient] = useState("");
   const [frontImageFile, setFrontImageFile] = useState(null);
@@ -56,19 +41,14 @@ const AdminPage = ({ currentAccount }) => {
   const [contractAddresses, setContractAddresses] = useState(null);
   const [erc20Balance, setErc20Balance] = useState(null);
   const [activeTab, setActiveTab] = useState("mintSelf");
-
-  // Keypair generation states
   const [keysToGenerate, setKeysToGenerate] = useState("1");
   const [generatedCSV, setGeneratedCSV] = useState(null);
-  // Automatically detect network name from provider
   const [networkName, setNetworkName] = useState("main");
-
   // New states for testing decryption
   const [testURL, setTestURL] = useState("");
   const [testDecryptionKey, setTestDecryptionKey] = useState("");
   const [testDecryptedPrivateKey, setTestDecryptedPrivateKey] = useState("");
 
-  // Inline styles for tab buttons
   const tabButtonStyle = {
     padding: "10px 20px",
     cursor: "pointer",
@@ -77,6 +57,7 @@ const AdminPage = ({ currentAccount }) => {
     marginRight: "5px",
     borderRadius: "4px"
   };
+
   const activeTabButtonStyle = {
     ...tabButtonStyle,
     backgroundColor: "#1976d2",
@@ -88,14 +69,23 @@ const AdminPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // Load contract addresses and network name from chains.json based on the connected network.
+  // Updated network detection: if on mainnet (0x1), switch to Sepolia (0xAA36A7)
   useEffect(() => {
     async function loadContractAddresses() {
       if (window.ethereum) {
         try {
           const provider = new ethers.providers.Web3Provider(window.ethereum);
           const network = await provider.getNetwork();
-          const chainIdHex = "0x" + network.chainId.toString(16);
+          let chainIdHex = "0x" + network.chainId.toString(16);
+          if (chainIdHex === "0x1") {
+            console.log("Mainnet detected in AdminPage. Switching to Sepolia testnet...");
+            await window.ethereum.request({
+              method: "wallet_switchEthereumChain",
+              params: [{ chainId: "0xAA36A7" }],
+            });
+            const networkAfter = await provider.getNetwork();
+            chainIdHex = "0x" + networkAfter.chainId.toString(16);
+          }
           if (chains[chainIdHex] && chains[chainIdHex].contracts) {
             setContractAddresses(chains[chainIdHex].contracts);
             setNetworkName(chains[chainIdHex].chainName);
@@ -173,6 +163,7 @@ const AdminPage = ({ currentAccount }) => {
       if (!frontFile) {
         throw new Error("Front image file is required");
       }
+      const ipfsClient = create({ url: "https://silverbacksipfs.online/api/v0" });
       const frontAdded = await ipfsClient.add(frontFile);
       const frontCID = frontAdded.path;
       log("Front image uploaded with CID: " + frontCID);
@@ -289,6 +280,7 @@ const AdminPage = ({ currentAccount }) => {
       const rows = fileText.split("\n").filter((row) => row.trim() !== "");
       const recipients = [];
       const metadataURIs = [];
+      const ipfsClient = create({ url: "https://silverbacksipfs.online/api/v0" });
       for (let row of rows) {
         const cols = row.split(",");
         if (cols.length < 3) continue;
@@ -367,28 +359,20 @@ const AdminPage = ({ currentAccount }) => {
     }
     const csvRows = ["address,privateKey,encryptedPrivateKey,encryptionKey,link"];
     const zip = new JSZip();
-    // Fixed IV for CTR mode (16 bytes of zeros)
     const iv = CryptoJS.enc.Hex.parse("00000000000000000000000000000000");
     for (let i = 0; i < count; i++) {
       const wallet = ethers.Wallet.createRandom();
       const encryptionKey = generateRandomString(8);
-      // Remove "0x" prefix so the plain key is 64 hex characters (32 bytes)
       const plainKey = wallet.privateKey.slice(2);
-      // Derive a 128-bit AES key from the encryption key using MD5
       const aesKey = CryptoJS.MD5(encryptionKey);
-      // Encrypt using AES in CTR mode with no padding
       const encrypted = CryptoJS.AES.encrypt(
         CryptoJS.enc.Hex.parse(plainKey),
         aesKey,
         { iv, mode: CryptoJS.mode.CTR, padding: CryptoJS.pad.NoPadding }
       );
-      // Get ciphertext as hex string
       const encryptedPrivateKey = encrypted.ciphertext.toString(CryptoJS.enc.Hex);
-      // Compile a link using the automatically calculated networkName
       const link = `http://silverbacksethdenver2025.win/?network=${networkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
       csvRows.push(`${wallet.address},${wallet.privateKey},${encryptedPrivateKey},${encryptionKey},${link}`);
-      
-      // Generate QR code for the encryption key with high error correction (H)
       const qrOptions = {
         errorCorrectionLevel: 'H',
         margin: 1,
@@ -396,21 +380,17 @@ const AdminPage = ({ currentAccount }) => {
         color: { dark: "#000000", light: "#ffffff" }
       };
       const dataUrl = await QRCode.toDataURL(encryptionKey, qrOptions);
-      // Remove data URL header to obtain base64 content only.
       const base64Data = dataUrl.replace(/^data:image\/png;base64,/, "");
-      // Save QR code image in the ZIP archive, named with the wallet address.
       zip.file(`${wallet.address}.png`, base64Data, { base64: true });
     }
     const csvString = csvRows.join("\n");
     zip.file("keypairs.csv", csvString);
-    // Generate ZIP blob and create a download URL.
     const zipBlob = await zip.generateAsync({ type: "blob" });
     const zipUrl = URL.createObjectURL(zipBlob);
     setGeneratedCSV(zipUrl);
     log(`Generated ${count} keypair(s) with AES-CTR encryption, CSV, and QR codes in ZIP.`);
   };
 
-  // Helper to generate a random alphanumeric string of given length
   const generateRandomString = (length) => {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
     let result = "";
@@ -423,7 +403,6 @@ const AdminPage = ({ currentAccount }) => {
   // --- New: Test Decryption Handler ---
   const handleTestDecryption = () => {
     try {
-      // Parse the URL to extract query parameter "pk"
       const urlObj = new URL(testURL);
       const encryptedPk = urlObj.searchParams.get("pk");
       if (!encryptedPk) {
@@ -436,9 +415,7 @@ const AdminPage = ({ currentAccount }) => {
         setTestDecryptedPrivateKey("Error: No decryption key provided.");
         return;
       }
-      // Fixed IV for AES CTR mode
       const iv = CryptoJS.enc.Hex.parse("00000000000000000000000000000000");
-      // Derive AES key using MD5 of the provided decryption key
       const aesKey = CryptoJS.MD5(testDecryptionKey);
       const decrypted = CryptoJS.AES.decrypt(
         { ciphertext: CryptoJS.enc.Hex.parse(encryptedPk) },
@@ -458,19 +435,29 @@ const AdminPage = ({ currentAccount }) => {
   return (
     <div className="container">
       <h1 className="center-align">Admin Dashboard</h1>
-      {/* Custom Tab Header */}
       <div style={{ marginBottom: "20px" }}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            style={activeTab === tab.id ? activeTabButtonStyle : tabButtonStyle}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <button onClick={() => setActiveTab("mintSelf")} style={activeTab === "mintSelf" ? activeTabButtonStyle : tabButtonStyle}>
+          Mint Self
+        </button>
+        <button onClick={() => setActiveTab("mintRecipient")} style={activeTab === "mintRecipient" ? activeTabButtonStyle : tabButtonStyle}>
+          Mint to Recipient
+        </button>
+        <button onClick={() => setActiveTab("batchMint")} style={activeTab === "batchMint" ? activeTabButtonStyle : tabButtonStyle}>
+          Batch Mint
+        </button>
+        <button onClick={() => setActiveTab("nfts")} style={activeTab === "nfts" ? activeTabButtonStyle : tabButtonStyle}>
+          Your NFTs
+        </button>
+        <button onClick={() => setActiveTab("debug")} style={activeTab === "debug" ? activeTabButtonStyle : tabButtonStyle}>
+          Debug Log
+        </button>
+        <button onClick={() => setActiveTab("generateKeys")} style={activeTab === "generateKeys" ? activeTabButtonStyle : tabButtonStyle}>
+          Generate Keys
+        </button>
+        <button onClick={() => setActiveTab("testDecryption")} style={activeTab === "testDecryption" ? activeTabButtonStyle : tabButtonStyle}>
+          Test Decryption
+        </button>
       </div>
-      {/* Tab Content */}
       <div>
         {activeTab === "mintSelf" && (
           <div>
@@ -483,16 +470,12 @@ const AdminPage = ({ currentAccount }) => {
                     <div className="file-field input-field">
                       <div className="btn">
                         <span>Front Image</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            if (e.target.files.length > 0) {
-                              setFrontImageFile(e.target.files[0]);
-                              log("Front image selected: " + e.target.files[0].name);
-                            }
-                          }}
-                        />
+                        <input type="file" accept="image/*" onChange={(e) => {
+                          if (e.target.files.length > 0) {
+                            setFrontImageFile(e.target.files[0]);
+                            log("Front image selected: " + e.target.files[0].name);
+                          }
+                        }} />
                       </div>
                       <div className="file-path-wrapper">
                         <input className="file-path validate" type="text" placeholder="Upload front image" />
@@ -503,16 +486,12 @@ const AdminPage = ({ currentAccount }) => {
                     <div className="file-field input-field">
                       <div className="btn">
                         <span>Back Image</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            if (e.target.files.length > 0) {
-                              setBackImageFile(e.target.files[0]);
-                              log("Back image selected: " + e.target.files[0].name);
-                            }
-                          }}
-                        />
+                        <input type="file" accept="image/*" onChange={(e) => {
+                          if (e.target.files.length > 0) {
+                            setBackImageFile(e.target.files[0]);
+                            log("Back image selected: " + e.target.files[0].name);
+                          }
+                        }} />
                       </div>
                       <div className="file-path-wrapper">
                         <input className="file-path validate" type="text" placeholder="Upload back image" />
@@ -522,12 +501,7 @@ const AdminPage = ({ currentAccount }) => {
                 </div>
                 <div className="row">
                   <div className="input-field col s12 m4">
-                    <input
-                      type="number"
-                      step="100"
-                      value={depositAmount}
-                      onChange={(e) => setDepositAmount(e.target.value)}
-                    />
+                    <input type="number" step="100" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
                     <label className="active">Deposit Amount</label>
                   </div>
                   <div className="col s12 m8">
@@ -549,28 +523,19 @@ const AdminPage = ({ currentAccount }) => {
                 <p>Deposit exactly 100 stablecoins to mint a Silverback NFT to a chosen recipient.</p>
                 <div className="row">
                   <div className="input-field col s12">
-                    <input
-                      type="text"
-                      placeholder="Recipient address"
-                      value={depositRecipient}
-                      onChange={(e) => setDepositRecipient(e.target.value)}
-                    />
+                    <input type="text" placeholder="Recipient address" value={depositRecipient} onChange={(e) => setDepositRecipient(e.target.value)} />
                     <label className="active">Recipient Address</label>
                   </div>
                   <div className="col s12 m6">
                     <div className="file-field input-field">
                       <div className="btn">
                         <span>Front Image</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            if (e.target.files.length > 0) {
-                              setFrontImageFile(e.target.files[0]);
-                              log("Front image selected: " + e.target.files[0].name);
-                            }
-                          }}
-                        />
+                        <input type="file" accept="image/*" onChange={(e) => {
+                          if (e.target.files.length > 0) {
+                            setFrontImageFile(e.target.files[0]);
+                            log("Front image selected: " + e.target.files[0].name);
+                          }
+                        }} />
                       </div>
                       <div className="file-path-wrapper">
                         <input className="file-path validate" type="text" placeholder="Upload front image" />
@@ -581,16 +546,12 @@ const AdminPage = ({ currentAccount }) => {
                     <div className="file-field input-field">
                       <div className="btn">
                         <span>Back Image</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => {
-                            if (e.target.files.length > 0) {
-                              setBackImageFile(e.target.files[0]);
-                              log("Back image selected: " + e.target.files[0].name);
-                            }
-                          }}
-                        />
+                        <input type="file" accept="image/*" onChange={(e) => {
+                          if (e.target.files.length > 0) {
+                            setBackImageFile(e.target.files[0]);
+                            log("Back image selected: " + e.target.files[0].name);
+                          }
+                        }} />
                       </div>
                       <div className="file-path-wrapper">
                         <input className="file-path validate" type="text" placeholder="Upload back image" />
@@ -618,16 +579,12 @@ const AdminPage = ({ currentAccount }) => {
                 <div className="file-field input-field">
                   <div className="btn">
                     <span>CSV File</span>
-                    <input
-                      type="file"
-                      accept=".csv"
-                      onChange={(e) => {
-                        if (e.target.files.length > 0) {
-                          setCsvFile(e.target.files[0]);
-                          log("CSV file selected: " + e.target.files[0].name);
-                        }
-                      }}
-                    />
+                    <input type="file" accept=".csv" onChange={(e) => {
+                      if (e.target.files.length > 0) {
+                        setCsvFile(e.target.files[0]);
+                        log("CSV file selected: " + e.target.files[0].name);
+                      }
+                    }} />
                   </div>
                   <div className="file-path-wrapper">
                     <input className="file-path validate" type="text" placeholder="Upload CSV" />
@@ -655,11 +612,7 @@ const AdminPage = ({ currentAccount }) => {
                         <div className="card">
                           <div className="card-image">
                             {n.image ? (
-                              <img
-                                src={n.image.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")}
-                                alt="NFT Front"
-                                style={{ height: "200px", objectFit: "cover" }}
-                              />
+                              <img src={n.image.replace("ipfs://", "https://silverbacksipfs.online/ipfs/")} alt="NFT Front" style={{ height: "200px", objectFit: "cover" }} />
                             ) : (
                               <p>No image available.</p>
                             )}
@@ -713,12 +666,7 @@ const AdminPage = ({ currentAccount }) => {
                 </ul>
                 <div className="row">
                   <div className="input-field col s12 m4">
-                    <input
-                      type="number"
-                      min="1"
-                      value={keysToGenerate}
-                      onChange={(e) => setKeysToGenerate(e.target.value)}
-                    />
+                    <input type="number" min="1" value={keysToGenerate} onChange={(e) => setKeysToGenerate(e.target.value)} />
                     <label className="active">Number of Keypairs</label>
                   </div>
                   <div className="col s12 m4">
@@ -750,21 +698,11 @@ const AdminPage = ({ currentAccount }) => {
                 </p>
                 <div className="row">
                   <div className="input-field col s12">
-                    <input
-                      type="text"
-                      placeholder="Enter URL (e.g. http://example.com/?network=main&address=...&pk=...)"
-                      value={testURL}
-                      onChange={(e) => setTestURL(e.target.value)}
-                    />
+                    <input type="text" placeholder="Enter URL (e.g. http://example.com/?network=main&address=...&pk=...)" value={testURL} onChange={(e) => setTestURL(e.target.value)} />
                     <label className="active">URL</label>
                   </div>
                   <div className="input-field col s12">
-                    <input
-                      type="text"
-                      placeholder="Enter decryption key"
-                      value={testDecryptionKey}
-                      onChange={(e) => setTestDecryptionKey(e.target.value)}
-                    />
+                    <input type="text" placeholder="Enter decryption key" value={testDecryptionKey} onChange={(e) => setTestDecryptionKey(e.target.value)} />
                     <label className="active">Decryption Key</label>
                   </div>
                 </div>
@@ -782,6 +720,14 @@ const AdminPage = ({ currentAccount }) => {
             </div>
           </div>
         )}
+      </div>
+      <div className="card-panel grey darken-3" style={{ color: "white" }}>
+        <h5>Debug Log</h5>
+        {logMessages.map((msg, idx) => (
+          <p key={idx} style={{ fontFamily: "monospace", margin: "0.2rem 0" }}>
+            {msg}
+          </p>
+        ))}
       </div>
     </div>
   );
