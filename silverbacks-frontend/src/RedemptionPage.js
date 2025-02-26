@@ -25,37 +25,41 @@ const vaultABI = [
 const RedemptionPage = ({ currentAccount }) => {
   const [searchParams] = useSearchParams();
 
-  // URL parameters – pk is the encrypted ephemeral private key
-  const encryptedPk = searchParams.get("pk") || "";
+  // Get URL parameters – encrypted pk and the ephemeral address
+  const originalEncryptedPk = searchParams.get("pk") || "";
   const urlAddress = searchParams.get("address") || "";
   const urlNetworkParam = searchParams.get("network");
 
+  // For display purposes only, format the encrypted pk into a valid hex string.
+  // (This dummy value is only used so NFTCard’s check passes and shows ephemeral buttons.)
+  const ephemeralDisplayPk = originalEncryptedPk
+    ? (() => {
+        // Remove any "0x" prefix from the original
+        const raw = originalEncryptedPk.startsWith("0x")
+          ? originalEncryptedPk.slice(2)
+          : originalEncryptedPk;
+        // Pad or trim to exactly 64 hex characters and re-add "0x"
+        return "0x" + raw.padEnd(64, "0").slice(0, 64);
+      })()
+    : "";
+
   // The ephemeral NFT owner (from the URL)
   const [ownerAddress, setOwnerAddress] = useState("");
-
-  // Ephemeral-owned NFTs for redemption
+  // NFTs owned by the ephemeral address (for redemption)
   const [redeemNfts, setRedeemNfts] = useState([]);
-
-  // Connected wallet's NFTs
+  // NFTs owned by the connected wallet
   const [myNfts, setMyNFTs] = useState([]);
-
   // Debug logging
   const [logMessages, setLogMessages] = useState([]);
-
   // Contract addresses from chains.json
   const [contractAddresses, setContractAddresses] = useState(null);
-
   // StableCoin balance of connected wallet
   const [erc20Balance, setErc20Balance] = useState(null);
-
   // For QR scanning and pending actions
   const [scanning, setScanning] = useState(false);
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
-
-  // For styling addresses
-  const addressStyle = { fontSize: "0.85em", fontFamily: "monospace" };
 
   // Logging helper
   const log = (msg) => {
@@ -90,7 +94,7 @@ const RedemptionPage = ({ currentAccount }) => {
   // 2) Store NFT owner address from URL if provided
   // --------------------------------------------------------------------------
   useEffect(() => {
-    if (encryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
+    if (originalEncryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
       setOwnerAddress(urlAddress);
       log(`NFT owner (from URL): ${urlAddress}`);
     } else {
@@ -98,7 +102,7 @@ const RedemptionPage = ({ currentAccount }) => {
         "No valid ephemeral wallet address in URL. Provide ?address=YOUR_WALLET_ADDRESS&pk=ENCRYPTED_KEY"
       );
     }
-  }, [encryptedPk, urlAddress]);
+  }, [originalEncryptedPk, urlAddress]);
 
   // --------------------------------------------------------------------------
   // 3) Load the connected wallet's ERC20 balance
@@ -146,16 +150,12 @@ const RedemptionPage = ({ currentAccount }) => {
         const tokenId = await nftContract.tokenOfOwnerByIndex(ownerAddress, i);
         const faceVal = await nftContract.faceValue(tokenId);
         const tokenURI = await nftContract.tokenURI(tokenId);
-        log(
-          `Redeem NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`
-        );
+        log(`Redeem NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
         let metadata = {};
         try {
           if (tokenURI.startsWith("ipfs://")) {
             const cid = tokenURI.slice(7);
-            const response = await fetch(
-              "https://silverbacksipfs.online/ipfs/" + cid
-            );
+            const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
             metadata = await response.json();
           }
         } catch (err) {
@@ -210,9 +210,7 @@ const RedemptionPage = ({ currentAccount }) => {
         try {
           if (tokenURI.startsWith("ipfs://")) {
             const cid = tokenURI.slice(7);
-            const response = await fetch(
-              "https://silverbacksipfs.online/ipfs/" + cid
-            );
+            const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
             metadata = await response.json();
           }
         } catch (err) {
@@ -244,7 +242,7 @@ const RedemptionPage = ({ currentAccount }) => {
   }, [currentAccount, contractAddresses]);
 
   // --------------------------------------------------------------------------
-  // 6) Initiate an action (redeem or claim) by opening the QR scanner
+  // 6) Initiate an action (for ephemeral NFTs) by opening the QR scanner
   // --------------------------------------------------------------------------
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
@@ -259,32 +257,23 @@ const RedemptionPage = ({ currentAccount }) => {
   const handleScan = async (data) => {
     if (data && scanning && pendingTokenId !== null && pendingAction) {
       let scannedKey = "";
-      // If data is an object, attempt to extract the 'text' property; otherwise convert to string
       if (typeof data === "string") {
         scannedKey = data;
       } else if (typeof data === "object") {
-        // Log the raw object for debugging
         log(`QR Code scanned raw data: ${JSON.stringify(data)}`);
-        if (data.text) {
-          scannedKey = data.text;
-        } else {
-          // Fallback: use the object string representation
-          scannedKey = JSON.stringify(data);
-        }
+        scannedKey = data.text || JSON.stringify(data);
       } else {
         scannedKey = String(data);
       }
       log(`Extracted decryption key from QR code: ${scannedKey}`);
-      log(`Encrypted PK from URL: ${encryptedPk}`);
+      log(`Original encrypted pk from URL: ${originalEncryptedPk}`);
 
       try {
-        // Prepare decryption parameters
         const iv = CryptoJS.enc.Hex.parse("00000000000000000000000000000000");
         const aesKey = CryptoJS.MD5(scannedKey);
         log(`Derived AES key (MD5 of scanned key): ${aesKey.toString()}`);
-        // Decrypt the ciphertext (encryptedPk)
         const decrypted = CryptoJS.AES.decrypt(
-          { ciphertext: CryptoJS.enc.Hex.parse(encryptedPk) },
+          { ciphertext: CryptoJS.enc.Hex.parse(originalEncryptedPk) },
           aesKey,
           { iv, mode: CryptoJS.mode.CTR, padding: CryptoJS.pad.NoPadding }
         );
@@ -294,29 +283,24 @@ const RedemptionPage = ({ currentAccount }) => {
         setDecryptedPrivateKey(ephemeralPk);
         log(`Decrypted ephemeral PK: ${ephemeralPk}`);
 
-        // Create a wallet from the decrypted private key
         const ephemeralWallet = new ethers.Wallet(ephemeralPk);
         const ephemeralAddress = ephemeralWallet.address;
         log(`Ephemeral wallet address: ${ephemeralAddress}`);
         log(`NFT owner (from URL): ${ownerAddress}`);
 
-        // Check that the ephemeral wallet address matches the owner address from URL
         if (ephemeralAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
-          log(
-            `ERROR: ephemeral address ${ephemeralAddress} != URL address ${ownerAddress}. Cannot proceed.`
-          );
+          log(`ERROR: ephemeral address ${ephemeralAddress} does not match URL address ${ownerAddress}. Cannot proceed.`);
           setScanning(false);
           setPendingTokenId(null);
           setPendingAction("");
           return;
         }
 
-        // Proceed to execute the redemption/claim action
+        // Execute the selected action using the original encrypted pk for decryption.
         await executeAction(pendingTokenId, pendingAction, ephemeralPk);
       } catch (err) {
         log(`Error during ephemeral PK decryption: ${err.message}`);
       }
-      // Reset scanning state
       setScanning(false);
       setPendingTokenId(null);
       setPendingAction("");
@@ -328,16 +312,14 @@ const RedemptionPage = ({ currentAccount }) => {
   };
 
   // --------------------------------------------------------------------------
-  // 8) Execute action: use the ephemeral key signature and have MetaMask pay gas
+  // 8A) Execute action for ephemeral NFTs (redeem or claim)
   // --------------------------------------------------------------------------
   const executeAction = async (tokenId, action, ephemeralPrivateKey) => {
     try {
       const ephemeralWallet = new ethers.Wallet(ephemeralPrivateKey);
-      // Prepare the message to sign
       let msg;
       let signature;
       let tx;
-      // Connected wallet pays gas
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
@@ -352,7 +334,7 @@ const RedemptionPage = ({ currentAccount }) => {
         log(`Transaction sent: redeemTo for tokenId=${tokenId}`);
         await tx.wait();
         log(`RedeemTo confirmed for tokenId=${tokenId}`);
-        loadMyNFTs();
+        loadRedeemNFTs();
         loadERC20Balance();
       } else if (action === "claim") {
         msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Claim:", tokenId]);
@@ -368,6 +350,52 @@ const RedemptionPage = ({ currentAccount }) => {
       }
     } catch (err) {
       log(`Error executing ${action} for tokenId ${tokenId}: ${err.message}`);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // 8B) For connected wallet NFTs: directly redeem (burn NFT to receive tokens)
+  // --------------------------------------------------------------------------
+  const handleRedeemConnected = async (tokenId) => {
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
+      log(`Redeeming NFT tokenId ${tokenId} for stablecoins...`);
+      const tx = await vaultContract.redeem(tokenId, { gasLimit: 10000000 });
+      await tx.wait();
+      log(`Redeem confirmed for tokenId ${tokenId}`);
+      loadMyNFTs();
+      loadERC20Balance();
+    } catch (err) {
+      log("Error redeeming NFT: " + err.message);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // 8C) For connected wallet NFTs: send NFT to another address
+  // --------------------------------------------------------------------------
+  const handleSendNFT = async (tokenId) => {
+    if (!currentAccount || !contractAddresses) {
+      log("Wallet not connected");
+      return;
+    }
+    const recipient = prompt("Enter the recipient address to send the NFT:");
+    if (!recipient || !ethers.utils.isAddress(recipient)) {
+      alert("Invalid address!");
+      return;
+    }
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, signer);
+      log(`Sending NFT tokenId ${tokenId} from ${currentAccount} to ${recipient}...`);
+      const tx = await nftContract["safeTransferFrom(address,address,uint256)"](currentAccount, recipient, tokenId);
+      await tx.wait();
+      log(`NFT tokenId ${tokenId} sent to ${recipient}`);
+      loadMyNFTs();
+    } catch (err) {
+      log("Error sending NFT: " + err.message);
     }
   };
 
@@ -395,7 +423,7 @@ const RedemptionPage = ({ currentAccount }) => {
           <div className="card-content">
             <span className="card-title">
               Redeeming NFTs for Ephemeral Address:{" "}
-              <code style={addressStyle}>{ownerAddress}</code>
+              <code style={{ fontSize: "0.85em", fontFamily: "monospace" }}>{ownerAddress}</code>
             </span>
             {redeemNfts.length > 0 ? (
               <div className="row">
@@ -403,6 +431,8 @@ const RedemptionPage = ({ currentAccount }) => {
                   <NFTCard
                     key={n.tokenId}
                     nft={n}
+                    // Pass the formatted dummy pk so that NFTCard shows "Redeem Stablecoin" and "Claim NFT"
+                    pk={ephemeralDisplayPk}
                     handleRedeem={() => initiateAction(n.tokenId, "redeem")}
                     handleClaimNFT={() => initiateAction(n.tokenId, "claim")}
                     handleRedeemTo={() => {}}
@@ -428,10 +458,11 @@ const RedemptionPage = ({ currentAccount }) => {
                   <NFTCard
                     key={n.tokenId}
                     nft={n}
-                    handleRedeem={() => initiateAction(n.tokenId, "redeem")}
-                    handleClaimNFT={() => initiateAction(n.tokenId, "claim")}
+                    // Do not pass a pk so that NFTCard shows "Redeem NFT" and "Send NFT"
+                    handleRedeem={() => handleRedeemConnected(n.tokenId)}
+                    handleSendNFT={() => handleSendNFT(n.tokenId)}
+                    handleClaimNFT={() => {}}
                     handleRedeemTo={() => {}}
-                    handleSendNFT={() => {}}
                   />
                 ))}
               </div>
@@ -462,12 +493,7 @@ const RedemptionPage = ({ currentAccount }) => {
           <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
             Please scan ephemeral key's QR code
           </h4>
-          <QrScanner
-            delay={300}
-            style={previewStyle}
-            onError={handleError}
-            onScan={handleScan}
-          />
+          <QrScanner delay={300} style={previewStyle} onError={handleError} onScan={handleScan} />
           <button
             style={{
               marginTop: "1rem",
