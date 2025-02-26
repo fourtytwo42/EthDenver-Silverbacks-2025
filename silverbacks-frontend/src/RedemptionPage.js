@@ -34,11 +34,9 @@ const RedemptionPage = ({ currentAccount }) => {
   // (This dummy value is only used so NFTCard’s check passes and shows ephemeral buttons.)
   const ephemeralDisplayPk = originalEncryptedPk
     ? (() => {
-        // Remove any "0x" prefix from the original
         const raw = originalEncryptedPk.startsWith("0x")
           ? originalEncryptedPk.slice(2)
           : originalEncryptedPk;
-        // Pad or trim to exactly 64 hex characters and re-add "0x"
         return "0x" + raw.padEnd(64, "0").slice(0, 64);
       })()
     : "";
@@ -68,13 +66,52 @@ const RedemptionPage = ({ currentAccount }) => {
   };
 
   // --------------------------------------------------------------------------
-  // 1) Load contract addresses from chains.json based on the connected network
+  // Helper: Get an ethers provider.
+  // If MetaMask (window.ethereum) is available, use it.
+  // Otherwise, fall back to a JSON‐RPC provider using the rpc endpoint from chains.json.
+  // The fallback chain is chosen by matching the URL query parameter "network"
+  // (if provided) or defaults to "0xaa36a7" (typically Sepolia).
+  // --------------------------------------------------------------------------
+  const getProvider = async () => {
+    if (window.ethereum) {
+      return new ethers.providers.Web3Provider(window.ethereum);
+    } else {
+      let targetChain;
+      if (urlNetworkParam) {
+        const chainKeys = Object.keys(chains);
+        targetChain = chainKeys.find((key) =>
+          chains[key].chainName.toLowerCase().includes(urlNetworkParam.toLowerCase())
+        );
+      }
+      if (!targetChain) {
+        // Default to Sepolia as defined in your chains.json
+        targetChain = "0xaa36a7";
+      }
+      const rpcUrl =
+        chains[targetChain].rpcUrls &&
+        chains[targetChain].rpcUrls.length > 0
+          ? chains[targetChain].rpcUrls[0]
+          : null;
+      if (!rpcUrl) {
+        throw new Error("No RPC URL available for fallback provider on chain " + targetChain);
+      }
+      return new ethers.providers.JsonRpcProvider(rpcUrl);
+    }
+  };
+
+  // --------------------------------------------------------------------------
+  // 1) Load contract addresses from chains.json using the provider (fallback if necessary)
   // --------------------------------------------------------------------------
   useEffect(() => {
     async function loadContractAddresses() {
-      if (!window.ethereum) return;
+      let provider;
       try {
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        provider = await getProvider();
+      } catch (err) {
+        log("Error creating provider: " + err.message);
+        return;
+      }
+      try {
         const network = await provider.getNetwork();
         const chainIdHex = "0x" + network.chainId.toString(16);
         if (chains[chainIdHex] && chains[chainIdHex].contracts) {
@@ -88,7 +125,7 @@ const RedemptionPage = ({ currentAccount }) => {
       }
     }
     loadContractAddresses();
-  }, []);
+  }, [urlNetworkParam]);
 
   // --------------------------------------------------------------------------
   // 2) Store NFT owner address from URL if provided
@@ -105,10 +142,14 @@ const RedemptionPage = ({ currentAccount }) => {
   }, [originalEncryptedPk, urlAddress]);
 
   // --------------------------------------------------------------------------
-  // 3) Load the connected wallet's ERC20 balance
+  // 3) Load the connected wallet's ERC20 balance (only if MetaMask is available)
   // --------------------------------------------------------------------------
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
+    if (!window.ethereum) {
+      log("MetaMask not available; cannot load connected wallet balance.");
+      return;
+    }
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const stableCoinContract = new ethers.Contract(
@@ -132,12 +173,18 @@ const RedemptionPage = ({ currentAccount }) => {
   }, [currentAccount, contractAddresses]);
 
   // --------------------------------------------------------------------------
-  // 4) Load ephemeral key's NFTs (for redemption) from the owner address
+  // 4) Load ephemeral key's NFTs (for redemption) from the owner address using fallback provider if needed
   // --------------------------------------------------------------------------
   const loadRedeemNFTs = async () => {
-    if (!ownerAddress || !window.ethereum || !contractAddresses) return;
+    if (!ownerAddress || !contractAddresses) return;
+    let provider;
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      provider = await getProvider();
+    } catch (err) {
+      log("Error creating provider in loadRedeemNFTs: " + err.message);
+      return;
+    }
+    try {
       const nftContract = new ethers.Contract(
         contractAddresses.silverbacksNFT,
         nftABI,
@@ -187,7 +234,7 @@ const RedemptionPage = ({ currentAccount }) => {
   }, [ownerAddress, contractAddresses]);
 
   // --------------------------------------------------------------------------
-  // 5) Load the connected wallet's NFTs
+  // 5) Load the connected wallet's NFTs (only if MetaMask is available)
   // --------------------------------------------------------------------------
   const loadMyNFTs = async () => {
     if (!currentAccount || !window.ethereum || !contractAddresses) return;
@@ -296,7 +343,7 @@ const RedemptionPage = ({ currentAccount }) => {
           return;
         }
 
-        // Execute the selected action using the original encrypted pk for decryption.
+        // Execute the selected action using the decrypted ephemeral private key.
         await executeAction(pendingTokenId, pendingAction, ephemeralPk);
       } catch (err) {
         log(`Error during ephemeral PK decryption: ${err.message}`);
@@ -320,6 +367,10 @@ const RedemptionPage = ({ currentAccount }) => {
       let msg;
       let signature;
       let tx;
+      if (!window.ethereum) {
+        log("MetaMask not available; using fallback provider for write operations is not supported.");
+        return;
+      }
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
@@ -357,6 +408,10 @@ const RedemptionPage = ({ currentAccount }) => {
   // 8B) For connected wallet NFTs: directly redeem (burn NFT to receive tokens)
   // --------------------------------------------------------------------------
   const handleRedeemConnected = async (tokenId) => {
+    if (!window.ethereum) {
+      log("MetaMask not available for redeeming connected NFTs.");
+      return;
+    }
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
@@ -376,8 +431,8 @@ const RedemptionPage = ({ currentAccount }) => {
   // 8C) For connected wallet NFTs: send NFT to another address
   // --------------------------------------------------------------------------
   const handleSendNFT = async (tokenId) => {
-    if (!currentAccount || !contractAddresses) {
-      log("Wallet not connected");
+    if (!currentAccount || !contractAddresses || !window.ethereum) {
+      log("Wallet not connected or MetaMask not available");
       return;
     }
     const recipient = prompt("Enter the recipient address to send the NFT:");
@@ -431,9 +486,7 @@ const RedemptionPage = ({ currentAccount }) => {
                   <NFTCard
                     key={n.tokenId}
                     nft={n}
-                    // Pass the formatted dummy pk so that NFTCard shows "Redeem Stablecoin" and "Claim NFT"
                     pk={ephemeralDisplayPk}
-                    // FIX: Use handleRedeemTo so that clicking the redeem button properly initiates the process
                     handleRedeemTo={() => initiateAction(n.tokenId, "redeem")}
                     handleClaimNFT={() => initiateAction(n.tokenId, "claim")}
                     handleRedeem={() => {}}
@@ -459,7 +512,6 @@ const RedemptionPage = ({ currentAccount }) => {
                   <NFTCard
                     key={n.tokenId}
                     nft={n}
-                    // Do not pass a pk so that NFTCard shows "Redeem NFT" and "Send NFT"
                     handleRedeem={() => handleRedeemConnected(n.tokenId)}
                     handleSendNFT={() => handleSendNFT(n.tokenId)}
                     handleClaimNFT={() => {}}
@@ -494,7 +546,13 @@ const RedemptionPage = ({ currentAccount }) => {
           <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
             Please scan ephemeral key's QR code
           </h4>
-          <QrScanner delay={300} style={previewStyle} onError={handleError} onScan={handleScan} />
+          <QrScanner
+            delay={300}
+            style={previewStyle}
+            onError={handleError}
+            onScan={handleScan}
+            constraints={{ video: { facingMode: "environment" } }}
+          />
           <button
             style={{
               marginTop: "1rem",
