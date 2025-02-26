@@ -1,12 +1,11 @@
 // C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\silverbacks-frontend\src\RedemptionPage.js
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
 import chains from "./chains.json";
 import NFTCard from "./NFTCard";
 import CryptoJS from "crypto-js";
-// Import the BarcodeScannerComponent from react-qr-barcode-scanner
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
 
 const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
@@ -40,7 +39,7 @@ const RedemptionPage = ({ currentAccount }) => {
   // Determine if on a mobile device for styling purposes.
   const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
-  // Full-screen modal container to center the QR scanner.
+  // Full-screen container to center the QR scanner.
   const modalContainerStyle = {
     position: "fixed",
     top: 0,
@@ -54,7 +53,7 @@ const RedemptionPage = ({ currentAccount }) => {
     zIndex: 1000
   };
 
-  // The modal box that contains the scanner (fixed width)
+  // Scanner modal styling.
   const scannerModalStyle = {
     width: "320px",
     backgroundColor: "rgba(0,0,0,0.9)",
@@ -63,7 +62,7 @@ const RedemptionPage = ({ currentAccount }) => {
     textAlign: "center"
   };
 
-  // Extract query parameters from the URL
+  // Extract query parameters.
   const [searchParams] = useSearchParams();
   const originalEncryptedPk = searchParams.get("pk") || "";
   const urlAddress = searchParams.get("address") || "";
@@ -78,7 +77,7 @@ const RedemptionPage = ({ currentAccount }) => {
       })()
     : "";
 
-  // State variables
+  // State variables.
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNFTs] = useState([]);
   const [myNfts, setMyNFTs] = useState([]);
@@ -89,30 +88,35 @@ const RedemptionPage = ({ currentAccount }) => {
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
-  // State for QR scanner controls
+  // State for QR scanner.
   const [stopStream, setStopStream] = useState(false);
   const [videoDevices, setVideoDevices] = useState([]);
-  const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
-  // New state to track if camera permission has been granted (only request once)
+  // Track if camera permission has been granted.
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
 
-  // Logging helper with timestamp
+  // Logging helper.
   const log = (msg) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${msg}`);
     setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
-  const previewStyle = {
-    height: 300,
-    width: 300,
-    margin: "0 auto",
-    border: "2px solid #fff",
-    borderRadius: "8px"
-  };
+  // Request camera permission once on component mount.
+  useEffect(() => {
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        setHasCameraPermission(true);
+        stream.getTracks().forEach(track => track.stop());
+        log("Camera permission granted.");
+      } catch (err) {
+        log(`Error requesting camera permission: ${err.message}`);
+      }
+    })();
+  }, []);
 
-  // Helper: Get an ethers provider.
+  // Helper: Get ethers provider.
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
@@ -129,8 +133,7 @@ const RedemptionPage = ({ currentAccount }) => {
         targetChain = "0xaa36a7";
       }
       const rpcUrl =
-        chains[targetChain].rpcUrls &&
-        chains[targetChain].rpcUrls.length > 0
+        chains[targetChain].rpcUrls && chains[targetChain].rpcUrls.length > 0
           ? chains[targetChain].rpcUrls[0]
           : null;
       if (!rpcUrl) {
@@ -141,9 +144,9 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 1) Load contract addresses
+  // 1) Load contract addresses.
   useEffect(() => {
-    async function loadContractAddresses() {
+    (async () => {
       try {
         const provider = await getProvider();
         const network = await provider.getNetwork();
@@ -158,11 +161,10 @@ const RedemptionPage = ({ currentAccount }) => {
       } catch (error) {
         log(`Error loading contract addresses: ${error.message}`);
       }
-    }
-    loadContractAddresses();
+    })();
   }, [urlNetworkParam]);
 
-  // 2) Store NFT owner address from URL if provided
+  // 2) Store NFT owner address from URL.
   useEffect(() => {
     if (originalEncryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
       setOwnerAddress(urlAddress);
@@ -172,7 +174,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [originalEncryptedPk, urlAddress]);
 
-  // 3) Load connected wallet's ERC20 balance
+  // 3) Load connected wallet's ERC20 balance.
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
     if (!window.ethereum) {
@@ -201,7 +203,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // 4) Load ephemeral key's NFTs
+  // 4) Load ephemeral key's NFTs.
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
     try {
@@ -255,7 +257,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [ownerAddress, contractAddresses]);
 
-  // 5) Load connected wallet's NFTs
+  // 5) Load connected wallet's NFTs.
   const loadMyNFTs = async () => {
     if (!currentAccount || !window.ethereum || !contractAddresses) return;
     try {
@@ -309,30 +311,18 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // 6) When scanning starts, request camera permission only once and then enumerate devices.
+  // 6) When scanning starts, simply enumerate available video devices.
   useEffect(() => {
     if (scanning) {
-      const requestPermissionAndEnumerate = async () => {
-        if (!hasCameraPermission) {
-          try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            setHasCameraPermission(true);
-            // Stop all tracks from the stream since we only need the permission.
-            stream.getTracks().forEach(track => track.stop());
-          } catch (err) {
-            log(`Error requesting camera permission: ${err.message}`);
-          }
-        }
+      (async function enumerateDevices() {
         try {
           const devices = await navigator.mediaDevices.enumerateDevices();
           const videoInputs = devices.filter((d) => d.kind === "videoinput");
-          setVideoDevices(videoInputs);
           if (videoInputs.length > 0) {
-            const backIndex = videoInputs.findIndex((d) => /back|rear/i.test(d.label));
-            const indexToUse = backIndex >= 0 ? backIndex : 0;
-            setSelectedCameraIndex(indexToUse);
-            setSelectedDeviceId(videoInputs[indexToUse].deviceId);
-            log(`Found ${videoInputs.length} video devices; using device index ${indexToUse} (${videoInputs[indexToUse].label})`);
+            setVideoDevices(videoInputs);
+            // Use the first available device.
+            setSelectedDeviceId(videoInputs[0].deviceId);
+            log(`Found ${videoInputs.length} video device(s); using the first device (${videoInputs[0].label}).`);
           } else {
             log("No video devices found.");
           }
@@ -340,12 +330,11 @@ const RedemptionPage = ({ currentAccount }) => {
           log(`Error enumerating video devices: ${err.message}`);
         }
         setStopStream(false);
-      };
-      requestPermissionAndEnumerate();
+      })();
     }
-  }, [scanning, hasCameraPermission]);
+  }, [scanning]);
 
-  // 7) Initiate an action (for ephemeral NFTs) by opening the QR scanner
+  // 7) Initiate an action (for ephemeral NFTs) by opening the QR scanner.
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
     setPendingAction(action);
@@ -354,7 +343,7 @@ const RedemptionPage = ({ currentAccount }) => {
     log(`Initiated ${action} for tokenId=${tokenId}. Please scan ephemeral key's QR code.`);
   };
 
-  // 8) Handle QR scan: once a valid result is obtained, immediately close the scanner and process the result.
+  // 8) Handle QR scan.
   const handleScan = async (err, result) => {
     if (err) {
       log(`QR Reader error: ${err.message}`);
@@ -364,12 +353,7 @@ const RedemptionPage = ({ currentAccount }) => {
       log("QR Reader result received");
       setStopStream(true);
       setScanning(false);
-      let scannedKey = "";
-      if (typeof result === "object" && result.text) {
-        scannedKey = result.text;
-      } else {
-        scannedKey = String(result);
-      }
+      let scannedKey = typeof result === "object" && result.text ? result.text : String(result);
       log(`Extracted decryption key from QR code: ${scannedKey}`);
       log(`Original encrypted pk from URL: ${originalEncryptedPk}`);
       try {
@@ -401,7 +385,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 9A) Execute action for ephemeral NFTs (redeem or claim)
+  // 9A) Execute action for ephemeral NFTs (redeem or claim).
   const executeAction = async (tokenId, action, ephemeralPrivateKey) => {
     try {
       const ephemeralWallet = new ethers.Wallet(ephemeralPrivateKey);
@@ -444,7 +428,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 9B) For connected wallet NFTs: directly redeem (burn NFT to receive tokens)
+  // 9B) For connected wallet NFTs: directly redeem.
   const handleRedeemConnected = async (tokenId) => {
     if (!window.ethereum) {
       log("MetaMask not available for redeeming connected NFTs.");
@@ -465,7 +449,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 9C) For connected wallet NFTs: send NFT to another address
+  // 9C) For connected wallet NFTs: send NFT.
   const handleSendNFT = async (tokenId) => {
     if (!currentAccount || !contractAddresses || !window.ethereum) {
       log("Wallet not connected or MetaMask not available");
@@ -558,7 +542,7 @@ const RedemptionPage = ({ currentAccount }) => {
               Please scan ephemeral key's QR code
             </h4>
             <BarcodeScannerComponent
-              delay={100} // Reduced delay for faster QR code detection
+              delay={100} // Faster QR detection
               width={300}
               height={300}
               stopStream={stopStream}
@@ -569,28 +553,6 @@ const RedemptionPage = ({ currentAccount }) => {
               }
               onUpdate={handleScan}
             />
-            {/* Button to cycle through available cameras if more than one exists */}
-            {videoDevices.length > 1 && (
-              <button
-                style={{
-                  marginTop: "0.5rem",
-                  padding: "0.5rem 1rem",
-                  backgroundColor: "#555",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer"
-                }}
-                onClick={() => {
-                  const nextIndex = (selectedCameraIndex + 1) % videoDevices.length;
-                  setSelectedCameraIndex(nextIndex);
-                  setSelectedDeviceId(videoDevices[nextIndex].deviceId);
-                  log(`Switching to camera: ${videoDevices[nextIndex].label || "unknown"}`);
-                }}
-              >
-                Switch Camera
-              </button>
-            )}
             <button
               style={{
                 marginTop: "0.5rem",
