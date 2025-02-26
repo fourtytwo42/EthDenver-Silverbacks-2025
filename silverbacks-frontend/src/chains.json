@@ -1,7 +1,7 @@
 {
   "0xaa36a7": {
     "chainId": "0xaa36a7",
-    "chainName": "sepolia-testnet",
+    "chainName": "ethereum-sepolia",
     "rpcUrls": [
       "https://rpc.sepolia.org"
     ],

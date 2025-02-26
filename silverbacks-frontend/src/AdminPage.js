@@ -33,6 +33,7 @@ const vaultABI = [
 ];
 
 const AdminPage = ({ currentAccount }) => {
+  // No forced network switching here—admin users rely on the header dropdown.
   const [depositAmount, setDepositAmount] = useState("100");
   const [depositRecipient, setDepositRecipient] = useState("");
   const [frontImageFile, setFrontImageFile] = useState(null);
@@ -45,9 +46,7 @@ const AdminPage = ({ currentAccount }) => {
   const [activeTab, setActiveTab] = useState("mintSelf");
   const [keysToGenerate, setKeysToGenerate] = useState("1");
   const [generatedCSV, setGeneratedCSV] = useState(null);
-  // networkName is initially set from loadContractAddresses
   const [networkName, setNetworkName] = useState("main");
-  // New states for testing decryption
   const [testURL, setTestURL] = useState("");
   const [testDecryptionKey, setTestDecryptionKey] = useState("");
   const [testDecryptedPrivateKey, setTestDecryptedPrivateKey] = useState("");
@@ -72,39 +71,44 @@ const AdminPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // Load contract addresses and set network name based on connected chain
-  useEffect(() => {
-    async function loadContractAddresses() {
-      if (window.ethereum) {
-        try {
-          const provider = new ethers.providers.Web3Provider(window.ethereum);
-          const network = await provider.getNetwork();
-          let chainIdHex = "0x" + network.chainId.toString(16);
-          if (chainIdHex === "0x1") {
-            console.log("Mainnet detected in AdminPage. Switching to Sepolia testnet...");
-            await window.ethereum.request({
-              method: "wallet_switchEthereumChain",
-              params: [{ chainId: "0xAA36A7" }],
-            });
-            const networkAfter = await provider.getNetwork();
-            chainIdHex = "0x" + networkAfter.chainId.toString(16);
-          }
-          if (chains[chainIdHex] && chains[chainIdHex].contracts) {
-            setContractAddresses(chains[chainIdHex].contracts);
-            setNetworkName(chains[chainIdHex].chainName);
-            log("Loaded contract addresses for chain " + chainIdHex);
-          } else {
-            log("Contracts not defined for chain " + chainIdHex);
-          }
-        } catch (error) {
-          log("Error loading contract addresses: " + error.message);
+  // Load contract addresses based on the current MetaMask chain.
+  const loadContractAddresses = async () => {
+    if (window.ethereum) {
+      try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const network = await provider.getNetwork();
+        const chainIdHex = "0x" + network.chainId.toString(16);
+        if (chains[chainIdHex] && chains[chainIdHex].contracts) {
+          setContractAddresses(chains[chainIdHex].contracts);
+          setNetworkName(chains[chainIdHex].chainName);
+          log("Loaded contract addresses for chain " + chainIdHex);
+        } else {
+          log("Contracts not defined for chain " + chainIdHex);
         }
+      } catch (error) {
+        log("Error loading contract addresses: " + error.message);
       }
     }
+  };
+
+  useEffect(() => {
     loadContractAddresses();
   }, []);
 
-  // Load stablecoin balance and NFT data for the connected account.
+  useEffect(() => {
+    if (window.ethereum && window.ethereum.on) {
+      const handleChainChanged = (chainId) => {
+        log("Chain changed to: " + chainId);
+        loadContractAddresses();
+      };
+      window.ethereum.on("chainChanged", handleChainChanged);
+      return () => {
+        window.ethereum.removeListener("chainChanged", handleChainChanged);
+      };
+    }
+  }, []);
+
+  // Load stablecoin balance and NFT data.
   const loadData = async () => {
     if (!currentAccount || !contractAddresses) return;
     const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -355,7 +359,6 @@ const AdminPage = ({ currentAccount }) => {
 
   // --- New: Keypair & Link Generation with QR Codes ---
   const handleGenerateKeys = async () => {
-    // Recalculate the current network name at CSV generation time.
     let currentNetworkName = networkName;
     if (window.ethereum) {
       try {
@@ -375,7 +378,6 @@ const AdminPage = ({ currentAccount }) => {
     const csvRows = ["address,privateKey,encryptedPrivateKey,encryptionKey,link"];
     const zip = new JSZip();
     const iv = CryptoJS.enc.Hex.parse("00000000000000000000000000000000");
-    // Use the current domain dynamically
     const currentDomain = window.location.origin;
     for (let i = 0; i < count; i++) {
       const wallet = ethers.Wallet.createRandom();
@@ -388,9 +390,7 @@ const AdminPage = ({ currentAccount }) => {
         { iv, mode: CryptoJS.mode.CTR, padding: CryptoJS.pad.NoPadding }
       );
       const encryptedPrivateKey = encrypted.ciphertext.toString(CryptoJS.enc.Hex);
-      // Build the dApp URL using the current network name at CSV creation time.
       const dappUrl = `${currentDomain}/?network=${currentNetworkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
-      // Build a deep link for Coinbase Wallet.
       const link = `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(dappUrl)}`;
       csvRows.push(`${wallet.address},${wallet.privateKey},${encryptedPrivateKey},${encryptionKey},${link}`);
       const qrOptions = {

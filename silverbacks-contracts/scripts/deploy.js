@@ -1,3 +1,4 @@
+// silverbacks-contracts/scripts/deploy.js
 const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
@@ -12,7 +13,6 @@ async function deployContract(contractFactory, contractName, ...args) {
 
   let estimatedGas, gasPrice, estimatedCost;
   try {
-    // Prepare the deployment transaction and estimate gas usage.
     const deployTx = contractFactory.getDeployTransaction(...args);
     estimatedGas = await deployer.estimateGas(deployTx);
     gasPrice = await deployer.getGasPrice();
@@ -89,12 +89,12 @@ async function main() {
   // Example chainDataMap with no spaces in chainName
   const chainDataMap = {
     11155111: {
-      chainName: "sepolia-testnet",      // <--- no spaces
+      chainName: "ethereum-sepolia", // updated naming convention
       rpc: process.env.RPC_URL || "",
       explorer: "https://sepolia.etherscan.io"
     },
     59141: {
-      chainName: "linea-sepolia",       // <--- replaced space with a hyphen
+      chainName: "linea-sepolia",
       rpc: process.env.LINEA_RPC_URL || "",
       explorer: "https://sepolia.lineascan.build"
     },

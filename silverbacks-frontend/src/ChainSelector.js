@@ -1,3 +1,5 @@
+// silverbacks-frontend/src/ChainSelector.js
+
 import React, { useState, useEffect, useRef } from "react";
 import { ethers } from "ethers";
 import chains from "./chains.json";
@@ -7,7 +9,7 @@ const ChainSelector = () => {
   const [isSupported, setIsSupported] = useState(true);
   const dropdownTriggerRef = useRef(null);
 
-  // Attempt to switch network to the target chain.
+  // Prompt MetaMask to switch to the target chain.
   const switchNetwork = async (targetChainId) => {
     if (!window.ethereum) return;
     try {
@@ -15,9 +17,9 @@ const ChainSelector = () => {
         method: "wallet_switchEthereumChain",
         params: [{ chainId: targetChainId }],
       });
-      fetchCurrentChain();
+      // Wait briefly to allow MetaMask to update.
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     } catch (switchError) {
-      // If the chain is not added, try to add it.
       if (switchError.code === 4902) {
         const addParams = buildAddChainParams(targetChainId);
         if (!addParams) {
@@ -29,7 +31,7 @@ const ChainSelector = () => {
             method: "wallet_addEthereumChain",
             params: [addParams],
           });
-          fetchCurrentChain();
+          await new Promise((resolve) => setTimeout(resolve, 1000));
         } catch (addError) {
           console.error("Error adding chain:", addError);
         }
@@ -56,20 +58,13 @@ const ChainSelector = () => {
     };
   };
 
-  // Fetch the current network chainId from MetaMask.
+  // Fetch the current network chainId from MetaMask (without forcing a switch).
   const fetchCurrentChain = async () => {
     if (window.ethereum) {
       try {
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const network = await provider.getNetwork();
-        let chainIdHex = "0x" + network.chainId.toString(16);
-        // If the current chain is Mainnet (0x1), automatically switch to Sepolia.
-        if (chainIdHex === "0x1") {
-          console.log("Mainnet detected. Switching to Sepolia testnet...");
-          await switchNetwork("0xAA36A7");
-          const networkAfter = await provider.getNetwork();
-          chainIdHex = "0x" + networkAfter.chainId.toString(16);
-        }
+        const chainIdHex = "0x" + network.chainId.toString(16);
         setCurrentChain(chainIdHex);
         setIsSupported(!!chains[chainIdHex]);
       } catch (error) {
@@ -80,22 +75,11 @@ const ChainSelector = () => {
 
   useEffect(() => {
     fetchCurrentChain();
-    if (window.ethereum) {
-      const handleChainChanged = (chainId) => {
-        setCurrentChain(chainId);
-        setIsSupported(!!chains[chainId]);
-      };
-      window.ethereum.on("chainChanged", handleChainChanged);
-      return () => {
-        if (window.ethereum.removeListener) {
-          window.ethereum.removeListener("chainChanged", handleChainChanged);
-        }
-      };
-    }
   }, []);
 
   const handleSelectChain = async (chainId) => {
     await switchNetwork(chainId);
+    fetchCurrentChain();
   };
 
   useEffect(() => {
