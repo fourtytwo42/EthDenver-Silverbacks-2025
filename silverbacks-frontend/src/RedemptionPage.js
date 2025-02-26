@@ -25,13 +25,11 @@ const vaultABI = [
 ];
 
 const RedemptionPage = ({ currentAccount }) => {
-  // NEW: Improved mobile detection for redirection.
+  // Improved mobile detection for redirection.
   useEffect(() => {
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    // Check for MetaMask indicators that are common on mobile (e.g. MetaMask, MetaMaskMobile, DappWeb3)
     const isMetaMaskBrowser = /MetaMask|MetaMaskMobile|DappWeb3/i.test(navigator.userAgent);
     if (isMobile && !isMetaMaskBrowser) {
-      // Remove protocol from current URL and prepend metamask.app.link/dapp/
       const currentUrl = window.location.href;
       const urlWithoutProtocol = currentUrl.replace(/^https?:\/\//, '');
       const metamaskDeepLink = `https://metamask.app.link/dapp/${urlWithoutProtocol}`;
@@ -65,7 +63,7 @@ const RedemptionPage = ({ currentAccount }) => {
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
-  // New state for QR scanner: to control the stream and camera selection
+  // State for QR scanner controls
   const [stopStream, setStopStream] = useState(false);
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
@@ -539,7 +537,7 @@ const RedemptionPage = ({ currentAccount }) => {
             Please scan ephemeral key's QR code
           </h4>
           <BarcodeScannerComponent
-            delay={500}
+            delay={100}  // Reduced delay for faster QR code detection
             width={300}
             height={300}
             stopStream={stopStream}
