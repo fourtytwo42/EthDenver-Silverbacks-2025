@@ -100,6 +100,8 @@ const RedemptionPage = ({ currentAccount }) => {
   useEffect(() => {
     async function chooseBackCamera() {
       try {
+        // Request temporary permission to list device labels if not already granted
+        await navigator.mediaDevices.getUserMedia({ video: true });
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter((device) => device.kind === "videoinput");
         // Look for a device whose label contains "back" or "rear" (case-insensitive)
@@ -110,7 +112,7 @@ const RedemptionPage = ({ currentAccount }) => {
           log(`Selected back camera: ${backDevice.label}`);
           setBackCameraId(backDevice.deviceId);
         } else {
-          log("No explicit back camera found; falling back to facingMode ideal 'environment'");
+          log("No explicit back camera found; forcing environment facing camera");
         }
       } catch (err) {
         log(`Error enumerating devices: ${err.message}`);
@@ -295,10 +297,11 @@ const RedemptionPage = ({ currentAccount }) => {
     log(`Initiated ${action} for tokenId=${tokenId}. Please scan ephemeral key's QR code.`);
   };
 
-  // 7) Handle QR scan: once a valid result is obtained, close the scanner and process the result.
+  // 7) Handle QR scan: once a valid result is obtained, immediately close the scanner and process the result.
   const handleScan = async (data) => {
     if (data && pendingTokenId !== null && pendingAction) {
-      // The scanner is closed immediately by the onResult callback (see below)
+      // Close the scanner immediately to avoid duplicate processing.
+      setScanning(false);
       let scannedKey = "";
       if (typeof data === "string") {
         scannedKey = data;
@@ -446,9 +449,7 @@ const RedemptionPage = ({ currentAccount }) => {
           <div className="card-content">
             <span className="card-title">
               Redeeming NFTs for Ephemeral Address:{" "}
-              <code style={{ fontSize: "0.85em", fontFamily: "monospace" }}>
-                {ownerAddress}
-              </code>
+              <code style={{ fontSize: "0.85em", fontFamily: "monospace" }}>{ownerAddress}</code>
             </span>
             {redeemNfts.length > 0 ? (
               <div className="row">
@@ -522,17 +523,16 @@ const RedemptionPage = ({ currentAccount }) => {
             onResult={(result, error) => {
               if (result) {
                 log("QR Reader result received");
-                // Close the scanner immediately and process the result
+                // Immediately close the scanner and process the result.
                 setScanning(false);
                 handleScan(result.text);
               } else if (error) {
                 log(`QR Reader error in onResult: ${error.message}`);
               }
             }}
+            // Force back camera by using exact facingMode constraint
             constraints={{
-              video: backCameraId
-                ? { deviceId: { exact: backCameraId } }
-                : { facingMode: { ideal: "environment" } }
+              video: { facingMode: { exact: "environment" } }
             }}
             videoProps={{
               playsInline: true,
