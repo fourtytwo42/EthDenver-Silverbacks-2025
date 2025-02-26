@@ -6,7 +6,6 @@ import chains from "./chains.json";
 import NFTCard from "./NFTCard";
 import CryptoJS from "crypto-js";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
-import OpenApp from "react-open-app";
 
 // Minimal ABIs for interacting with our contracts
 const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
@@ -24,22 +23,13 @@ const vaultABI = [
   "function claimNFT(uint256 tokenId, bytes signature) external"
 ];
 
-const RedemptionPage = ({ currentAccount }) => {
-  // --- Fallback Prompt using react-open-app ---
-  const [showFallback, setShowFallback] = useState(false);
-  useEffect(() => {
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const isCoinbaseInApp = /Coinbase/i.test(navigator.userAgent);
-    if (isMobile && !isCoinbaseInApp) {
-      setShowFallback(true);
-    }
-  }, []);
-
-  // --- Query Parameters & Ephemeral PK Display ---
+const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
+  // Use search params to extract network, address and encrypted pk
   const [searchParams] = useSearchParams();
-  const originalEncryptedPk = searchParams.get("pk") || "";
-  const urlAddress = searchParams.get("address") || "";
   const urlNetworkParam = searchParams.get("network");
+  const urlAddress = searchParams.get("address") || "";
+  const originalEncryptedPk = searchParams.get("pk") || "";
+  // For display, we pad the encrypted key to 64 hex characters.
   const ephemeralDisplayPk = originalEncryptedPk
     ? (() => {
         const raw = originalEncryptedPk.startsWith("0x")
@@ -49,7 +39,7 @@ const RedemptionPage = ({ currentAccount }) => {
       })()
     : "";
 
-  // --- State Variables ---
+  // State variables
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNFTs] = useState([]);
   const [myNfts, setMyNFTs] = useState([]);
@@ -60,20 +50,87 @@ const RedemptionPage = ({ currentAccount }) => {
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
-  // QR Scanner controls
+  // QR scanner controls
   const [stopStream, setStopStream] = useState(false);
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
 
-  // --- Logging Helper ---
+  // Logging helper
   const log = (msg) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${msg}`);
     setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
-  // --- Updated getProvider function with network switching and auto-adding ---
+  // --- Wallet connection prompt (full-screen) for mobile ---
+  const connectWallet = async () => {
+    if (window.ethereum) {
+      try {
+        const accounts = await window.ethereum.request({
+          method: "eth_requestAccounts"
+        });
+        setCurrentAccount(accounts[0]);
+      } catch (err) {
+        log("Error connecting wallet: " + err.message);
+      }
+    } else {
+      alert("MetaMask is not installed!");
+    }
+  };
+
+  // If wallet is not connected, show a full‑screen prompt.
+  if (!currentAccount) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+          backgroundColor: "#ffffff",
+          textAlign: "center",
+          padding: "1rem"
+        }}
+      >
+        <h1 style={{ fontSize: "2rem", marginBottom: "1.5rem" }}>
+          Please Connect Your Wallet
+        </h1>
+        <button
+          onClick={connectWallet}
+          style={{
+            padding: "1rem 2rem",
+            fontSize: "1.2rem",
+            backgroundColor: "#1976d2",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            cursor: "pointer"
+          }}
+        >
+          Connect Wallet
+        </button>
+      </div>
+    );
+  }
+
+  // --- Top banner showing network name (from URL) ---
+  const renderNetworkBanner = () => (
+    <div
+      style={{
+        backgroundColor: "#1976d2",
+        color: "#fff",
+        padding: "1rem",
+        textAlign: "center",
+        fontSize: "1.2rem"
+      }}
+    >
+      {urlNetworkParam ? urlNetworkParam.toUpperCase() : "NETWORK"}
+    </div>
+  );
+
+  // --- Provider with network switching and auto-add functionality ---
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
@@ -84,20 +141,19 @@ const RedemptionPage = ({ currentAccount }) => {
           chains[key].chainName.toLowerCase().includes(urlNetworkParam.toLowerCase())
         );
         if (targetChainKey) {
-          const targetChainId = targetChainKey; // keys are assumed to be in hex format (e.g., "0xaa36a7")
+          const targetChainId = targetChainKey; // keys are assumed to be in hex
           const network = await provider.getNetwork();
           const currentChainIdHex = "0x" + network.chainId.toString(16);
           if (currentChainIdHex.toLowerCase() !== targetChainId.toLowerCase()) {
-            log(`Switching network from ${currentChainIdHex} to ${targetChainId} as specified in URL`);
+            log(`Switching network from ${currentChainIdHex} to ${targetChainId}`);
             try {
               await window.ethereum.request({
                 method: "wallet_switchEthereumChain",
-                params: [{ chainId: targetChainId }],
+                params: [{ chainId: targetChainId }]
               });
             } catch (switchError) {
-              // If error indicates the chain is not added, attempt to add it
               if (switchError.code === 4902) {
-                log(`Network ${targetChainId} not added. Attempting to add new network.`);
+                log(`Network ${targetChainId} not added. Attempting to add network.`);
                 const chainData = chains[targetChainId];
                 if (chainData) {
                   const addParams = {
@@ -110,18 +166,18 @@ const RedemptionPage = ({ currentAccount }) => {
                   try {
                     await window.ethereum.request({
                       method: "wallet_addEthereumChain",
-                      params: [addParams],
+                      params: [addParams]
                     });
-                    log(`Successfully added network ${targetChainId}. Now switching network.`);
+                    log(`Added network ${targetChainId}. Switching now.`);
                     await window.ethereum.request({
                       method: "wallet_switchEthereumChain",
-                      params: [{ chainId: targetChainId }],
+                      params: [{ chainId: targetChainId }]
                     });
                   } catch (addError) {
-                    log("Error adding new network: " + addError.message);
+                    log("Error adding network: " + addError.message);
                   }
                 } else {
-                  log("Chain data not found for targetChainId: " + targetChainId);
+                  log("Chain data not found for " + targetChainId);
                 }
               } else {
                 log("Error switching network: " + switchError.message);
@@ -132,19 +188,10 @@ const RedemptionPage = ({ currentAccount }) => {
       }
       return provider;
     } else {
-      // Fallback to JSON-RPC provider if no window.ethereum available
-      let targetChain;
-      if (urlNetworkParam) {
-        const chainKeys = Object.keys(chains);
-        targetChain = chainKeys.find((key) =>
-          chains[key].chainName.toLowerCase().includes(urlNetworkParam.toLowerCase())
-        );
-      }
-      if (!targetChain) {
-        targetChain = "0xaa36a7";
-      }
+      // Fallback JSON-RPC provider
+      let targetChain = "0xaa36a7"; // default to Sepolia if no window.ethereum
       const rpcUrl =
-        chains[targetChain].rpc && chains[targetChain].rpc.length > 0
+        chains[targetChain] && chains[targetChain].rpc && chains[targetChain].rpc.length > 0
           ? chains[targetChain].rpc
           : null;
       if (!rpcUrl) {
@@ -155,17 +202,17 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // --- 2) Set NFT Owner Address from URL ---
+  // --- Set NFT owner address from URL ---
   useEffect(() => {
     if (originalEncryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
       setOwnerAddress(urlAddress);
       log(`NFT owner (from URL): ${urlAddress}`);
     } else {
-      log("No valid ephemeral wallet address in URL. Provide ?address=YOUR_WALLET_ADDRESS&pk=ENCRYPTED_KEY");
+      log("No valid ephemeral wallet address in URL. Please provide ?address=YOUR_ADDRESS&pk=ENCRYPTED_KEY");
     }
   }, [originalEncryptedPk, urlAddress]);
 
-  // --- 3) Load Contract Addresses ---
+  // --- Load contract addresses ---
   useEffect(() => {
     async function loadContractAddresses() {
       try {
@@ -186,16 +233,16 @@ const RedemptionPage = ({ currentAccount }) => {
     loadContractAddresses();
   }, [urlNetworkParam]);
 
-  // --- 4) Load Connected Wallet's ERC20 Balance ---
+  // --- Load connected wallet's ERC20 balance ---
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
-    if (!window.ethereum) {
-      log("MetaMask not available; cannot load connected wallet balance.");
-      return;
-    }
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
+      const stableCoinContract = new ethers.Contract(
+        contractAddresses.stableCoin,
+        stableCoinABI,
+        provider
+      );
       const balance = await stableCoinContract.balanceOf(currentAccount);
       const formatted = ethers.utils.formatEther(balance);
       log(`Connected wallet ERC20 balance: ${formatted}`);
@@ -211,7 +258,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // --- 5) Load Ephemeral Key's NFTs ---
+  // --- Load ephemeral key's NFTs ---
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
     try {
@@ -261,9 +308,9 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [ownerAddress, contractAddresses]);
 
-  // --- 6) Load Connected Wallet's NFTs ---
+  // --- Load connected wallet's NFTs ---
   const loadMyNFTs = async () => {
-    if (!currentAccount || !window.ethereum || !contractAddresses) return;
+    if (!currentAccount || !contractAddresses) return;
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
@@ -281,7 +328,7 @@ const RedemptionPage = ({ currentAccount }) => {
             const cid = tokenURI.slice(7);
             const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
             metadata = await response.json();
-            log(`Fetched metadata for connected tokenId=${tokenId}`);
+            log(`Fetched metadata for tokenId=${tokenId}`);
           }
         } catch (err) {
           log(`Error fetching metadata for token ${tokenId}: ${err.message}`);
@@ -311,7 +358,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // --- 7) Enumerate Video Devices when Scanning ---
+  // --- Enumerate video devices when scanning ---
   useEffect(() => {
     if (scanning) {
       async function enumerateDevices() {
@@ -325,7 +372,7 @@ const RedemptionPage = ({ currentAccount }) => {
             const indexToUse = backIndex >= 0 ? backIndex : 0;
             setSelectedCameraIndex(indexToUse);
             setSelectedDeviceId(videoInputs[indexToUse].deviceId);
-            log(`Found ${videoInputs.length} video devices; using device index ${indexToUse} (${videoInputs[indexToUse].label})`);
+            log(`Using camera: ${videoInputs[indexToUse].label || "unknown"}`);
           } else {
             log("No video devices found.");
           }
@@ -338,73 +385,60 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [scanning]);
 
-  // --- 8) Initiate Action via QR Scanner ---
+  // --- Initiate action via QR scanner ---
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
     setPendingAction(action);
     setStopStream(false);
     setScanning(true);
-    log(`Initiated ${action} for tokenId=${tokenId}. Please scan ephemeral key's QR code.`);
+    log(`Initiated ${action} for tokenId=${tokenId}. Please scan the ephemeral key’s QR code.`);
   };
 
-  // --- 9) Handle QR Scan ---
+  // --- Handle QR scan ---
   const handleScan = async (err, result) => {
     if (err) {
       log(`QR Reader error: ${err.message}`);
       return;
     }
     if (result && pendingTokenId !== null && pendingAction) {
-      log("QR Reader result received");
+      log("QR scan result received.");
       setStopStream(true);
       setScanning(false);
-      let scannedKey = "";
-      if (typeof result === "object" && result.text) {
-        scannedKey = result.text;
-      } else {
-        scannedKey = String(result);
-      }
+      let scannedKey = typeof result === "object" && result.text ? result.text : String(result);
       log(`Extracted decryption key from QR code: ${scannedKey}`);
-      log(`Original encrypted pk from URL: ${originalEncryptedPk}`);
       try {
         const iv = CryptoJS.enc.Hex.parse("00000000000000000000000000000000");
         const aesKey = CryptoJS.MD5(scannedKey);
-        log(`Derived AES key (MD5 of scanned key): ${aesKey.toString()}`);
+        log(`Derived AES key: ${aesKey.toString()}`);
         const decrypted = CryptoJS.AES.decrypt(
           { ciphertext: CryptoJS.enc.Hex.parse(originalEncryptedPk) },
           aesKey,
           { iv, mode: CryptoJS.mode.CTR, padding: CryptoJS.pad.NoPadding }
         );
         const decryptedHex = decrypted.toString(CryptoJS.enc.Hex);
-        log(`Decrypted hex output: ${decryptedHex}`);
+        log(`Decrypted hex: ${decryptedHex}`);
         const ephemeralPk = "0x" + decryptedHex;
         setDecryptedPrivateKey(ephemeralPk);
         log(`Decrypted ephemeral PK: ${ephemeralPk}`);
         const ephemeralWallet = new ethers.Wallet(ephemeralPk);
         const ephemeralAddress = ephemeralWallet.address;
         log(`Ephemeral wallet address: ${ephemeralAddress}`);
-        log(`NFT owner (from URL): ${ownerAddress}`);
         if (ephemeralAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
-          log(`ERROR: ephemeral address ${ephemeralAddress} does not match URL address ${ownerAddress}. Cannot proceed.`);
+          log(`ERROR: ephemeral address ${ephemeralAddress} does not match URL address ${ownerAddress}.`);
           return;
         }
         await executeAction(pendingTokenId, pendingAction, ephemeralPk);
       } catch (e) {
-        log(`Error during ephemeral PK decryption: ${e.message}`);
+        log(`Error during decryption: ${e.message}`);
       }
     }
   };
 
-  // --- 9A) Execute Action for Ephemeral NFTs ---
+  // --- Execute action for ephemeral NFTs ---
   const executeAction = async (tokenId, action, ephemeralPrivateKey) => {
     try {
       const ephemeralWallet = new ethers.Wallet(ephemeralPrivateKey);
-      let msg;
-      let signature;
-      let tx;
-      if (!window.ethereum) {
-        log("MetaMask not available; cannot perform write operations.");
-        return;
-      }
+      let msg, signature, tx;
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
@@ -413,11 +447,10 @@ const RedemptionPage = ({ currentAccount }) => {
         const messageHashBytes = ethers.utils.arrayify(msg);
         signature = await ephemeralWallet.signMessage(messageHashBytes);
         log(`Ephemeral signature (redeem): ${signature}`);
-        log(`Calling vaultContract.redeemTo(${tokenId}, signature)...`);
         tx = await vaultContract.redeemTo(tokenId, signature);
-        log(`Transaction sent: redeemTo for tokenId=${tokenId}`);
+        log(`redeemTo transaction sent for tokenId=${tokenId}`);
         await tx.wait();
-        log(`RedeemTo confirmed for tokenId=${tokenId}`);
+        log(`redeemTo confirmed for tokenId=${tokenId}`);
         loadRedeemNFTs();
         loadERC20Balance();
       } else if (action === "claim") {
@@ -425,11 +458,10 @@ const RedemptionPage = ({ currentAccount }) => {
         const messageHashBytes = ethers.utils.arrayify(msg);
         signature = await ephemeralWallet.signMessage(messageHashBytes);
         log(`Ephemeral signature (claim): ${signature}`);
-        log(`Calling vaultContract.claimNFT(${tokenId}, signature)...`);
         tx = await vaultContract.claimNFT(tokenId, signature);
-        log(`Transaction sent: claimNFT for tokenId=${tokenId}`);
+        log(`claimNFT transaction sent for tokenId=${tokenId}`);
         await tx.wait();
-        log(`ClaimNFT confirmed for tokenId=${tokenId}`);
+        log(`claimNFT confirmed for tokenId=${tokenId}`);
         loadRedeemNFTs();
       }
     } catch (err) {
@@ -437,17 +469,13 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // --- 9B) Redeem Connected Wallet NFT ---
+  // --- Handle connected wallet NFT redemption ---
   const handleRedeemConnected = async (tokenId) => {
-    if (!window.ethereum) {
-      log("MetaMask not available for redeeming connected NFTs.");
-      return;
-    }
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
-      log(`Redeeming NFT tokenId ${tokenId} for stablecoins...`);
+      log(`Redeeming NFT tokenId ${tokenId}...`);
       const tx = await vaultContract.redeem(tokenId, { gasLimit: 10000000 });
       await tx.wait();
       log(`Redeem confirmed for tokenId ${tokenId}`);
@@ -458,13 +486,9 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // --- 9C) Send Connected Wallet NFT ---
+  // --- Handle sending NFT from connected wallet ---
   const handleSendNFT = async (tokenId) => {
-    if (!currentAccount || !contractAddresses || !window.ethereum) {
-      log("Wallet not connected or MetaMask not available");
-      return;
-    }
-    const recipient = prompt("Enter the recipient address to send the NFT:");
+    const recipient = prompt("Enter the recipient address:");
     if (!recipient || !ethers.utils.isAddress(recipient)) {
       alert("Invalid address!");
       return;
@@ -473,7 +497,7 @@ const RedemptionPage = ({ currentAccount }) => {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, signer);
-      log(`Sending NFT tokenId ${tokenId} from ${currentAccount} to ${recipient}...`);
+      log(`Sending NFT tokenId ${tokenId} to ${recipient}...`);
       const tx = await nftContract["safeTransferFrom(address,address,uint256)"](currentAccount, recipient, tokenId);
       await tx.wait();
       log(`NFT tokenId ${tokenId} sent to ${recipient}`);
@@ -483,37 +507,21 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
+  // --- Main render ---
   return (
-    <div className="container">
-      {/* Fallback Prompt using react-open-app */}
-      {showFallback && (
-        <div style={{ padding: "1rem", background: "#fffae6", textAlign: "center" }}>
-          <p>
-            For the best experience, please open this dApp in Coinbase Wallet's dApp browser.
-          </p>
-          <OpenApp
-            href={window.location.href}
-            android={`https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(window.location.href)}`}
-            ios={`https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(window.location.href)}`}
-            blank={true}
-          >
-            Open in Coinbase Wallet
-          </OpenApp>
-        </div>
-      )}
-      <h1 className="center-align">Redemption Page</h1>
-      {/* Ephemeral Key's NFTs Section */}
-      {ownerAddress && (
-        <div className="card">
-          <div className="card-content">
-            <span className="card-title">
-              Redeeming NFTs for Ephemeral Address:{" "}
-              <code style={{ fontSize: "0.85em", fontFamily: "monospace" }}>
-                {ownerAddress}
-              </code>
-            </span>
+    <div style={{ padding: 0, margin: 0, backgroundColor: "#f9f9f9", minHeight: "100vh" }}>
+      {/* Top banner showing network name */}
+      {renderNetworkBanner()}
+      <div style={{ padding: "1rem" }}>
+        {/* Section for NFTs held by the ephemeral key (for redemption) */}
+        {ownerAddress && (
+          <div style={{ marginBottom: "1rem" }}>
+            <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>
+              Redeem NFTs for Ephemeral Address:
+            </h2>
+            <code style={{ fontSize: "0.9rem" }}>{ownerAddress}</code>
             {redeemNfts.length > 0 ? (
-              <div className="row">
+              <div style={{ display: "flex", flexWrap: "wrap", marginTop: "1rem" }}>
                 {redeemNfts.map((n) => (
                   <NFTCard
                     key={n.tokenId}
@@ -527,18 +535,19 @@ const RedemptionPage = ({ currentAccount }) => {
                 ))}
               </div>
             ) : (
-              <p>No redeemable NFTs found for ephemeral address {ownerAddress}</p>
+              <p style={{ fontSize: "1rem" }}>
+                No redeemable NFTs found for ephemeral address {ownerAddress}
+              </p>
             )}
           </div>
-        </div>
-      )}
-      {/* Connected Wallet's NFTs Section */}
-      {currentAccount && (
-        <div className="card">
-          <div className="card-content">
-            <span className="card-title">Your Connected Wallet NFTs</span>
+        )}
+
+        {/* Section for NFTs held by the connected wallet */}
+        {currentAccount && (
+          <div style={{ marginBottom: "1rem" }}>
+            <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>Your Wallet NFTs</h2>
             {myNfts.length > 0 ? (
-              <div className="row">
+              <div style={{ display: "flex", flexWrap: "wrap", marginTop: "1rem" }}>
                 {myNfts.map((n) => (
                   <NFTCard
                     key={n.tokenId}
@@ -551,91 +560,95 @@ const RedemptionPage = ({ currentAccount }) => {
                 ))}
               </div>
             ) : (
-              <p>No NFTs found in your connected wallet.</p>
+              <p style={{ fontSize: "1rem" }}>
+                No NFTs found in your connected wallet.
+              </p>
             )}
           </div>
-        </div>
-      )}
-      {/* QR Code Scanner Modal */}
-      {scanning && (
-        <div
-          style={{
-            position: "fixed",
-            top: "20%",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "320px",
-            backgroundColor: "rgba(0,0,0,0.9)",
-            padding: "1rem",
-            borderRadius: "8px",
-            zIndex: 1000,
-            textAlign: "center",
-          }}
-        >
-          <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
-            Please scan ephemeral key's QR code
-          </h4>
-          <BarcodeScannerComponent
-            delay={100}
-            width={300}
-            height={300}
-            stopStream={stopStream}
-            videoConstraints={
-              selectedDeviceId
-                ? { deviceId: { exact: selectedDeviceId } }
-                : { facingMode: "environment" }
-            }
-            onUpdate={handleScan}
-          />
-          {videoDevices.length > 1 && (
+        )}
+
+        {/* QR Code Scanner Modal */}
+        {scanning && (
+          <div
+            style={{
+              position: "fixed",
+              top: "20%",
+              left: "50%",
+              transform: "translateX(-50%)",
+              width: "320px",
+              backgroundColor: "rgba(0,0,0,0.9)",
+              padding: "1rem",
+              borderRadius: "8px",
+              zIndex: 1000,
+              textAlign: "center"
+            }}
+          >
+            <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
+              Scan ephemeral key QR code
+            </h4>
+            <BarcodeScannerComponent
+              delay={100}
+              width={300}
+              height={300}
+              stopStream={stopStream}
+              videoConstraints={
+                selectedDeviceId
+                  ? { deviceId: { exact: selectedDeviceId } }
+                  : { facingMode: "environment" }
+              }
+              onUpdate={handleScan}
+            />
+            {videoDevices.length > 1 && (
+              <button
+                style={{
+                  marginTop: "0.5rem",
+                  padding: "0.5rem 1rem",
+                  backgroundColor: "#555",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: "pointer"
+                }}
+                onClick={() => {
+                  const nextIndex = (selectedCameraIndex + 1) % videoDevices.length;
+                  setSelectedCameraIndex(nextIndex);
+                  setSelectedDeviceId(videoDevices[nextIndex].deviceId);
+                  log(`Switching to camera: ${videoDevices[nextIndex].label || "unknown"}`);
+                }}
+              >
+                Switch Camera
+              </button>
+            )}
             <button
               style={{
                 marginTop: "0.5rem",
                 padding: "0.5rem 1rem",
-                backgroundColor: "#555",
+                backgroundColor: "#1976d2",
                 color: "#fff",
                 border: "none",
                 borderRadius: "4px",
-                cursor: "pointer",
+                cursor: "pointer"
               }}
               onClick={() => {
-                const nextIndex = (selectedCameraIndex + 1) % videoDevices.length;
-                setSelectedCameraIndex(nextIndex);
-                setSelectedDeviceId(videoDevices[nextIndex].deviceId);
-                log(`Switching to camera: ${videoDevices[nextIndex].label || "unknown"}`);
+                log("QR scanning cancelled by user");
+                setStopStream(true);
+                setScanning(false);
               }}
             >
-              Switch Camera
+              Cancel
             </button>
-          )}
-          <button
-            style={{
-              marginTop: "0.5rem",
-              padding: "0.5rem 1rem",
-              backgroundColor: "#1976d2",
-              color: "#fff",
-              border: "none",
-              borderRadius: "4px",
-              cursor: "pointer",
-            }}
-            onClick={() => {
-              log("QR scanning cancelled by user");
-              setStopStream(true);
-              setScanning(false);
-            }}
-          >
-            Cancel
-          </button>
+          </div>
+        )}
+
+        {/* Optional: Debug Log (can be hidden or removed in production) */}
+        <div style={{ marginTop: "2rem", padding: "0.5rem", backgroundColor: "#424242", color: "#fff", fontSize: "0.8rem" }}>
+          <h5>Debug Log</h5>
+          {logMessages.map((msg, idx) => (
+            <p key={idx} style={{ fontFamily: "monospace", margin: "0.2rem 0" }}>
+              {msg}
+            </p>
+          ))}
         </div>
-      )}
-      {/* Debug Log */}
-      <div className="card-panel grey darken-3" style={{ color: "white", marginTop: "2rem" }}>
-        <h5>Debug Log</h5>
-        {logMessages.map((msg, idx) => (
-          <p key={idx} style={{ fontFamily: "monospace", margin: "0.2rem 0" }}>
-            {msg}
-          </p>
-        ))}
       </div>
     </div>
   );
