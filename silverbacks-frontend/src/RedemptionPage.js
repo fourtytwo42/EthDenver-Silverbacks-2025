@@ -1,5 +1,4 @@
 // C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\silverbacks-frontend\src\RedemptionPage.js
-
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
@@ -27,12 +26,12 @@ const vaultABI = [
 
 const RedemptionPage = ({ currentAccount }) => {
   // --- Fallback Prompt using react-open-app ---
-  // If on mobile but not inside MetaMask's in-app browser, show a prompt.
+  // If on mobile but not inside Coinbase Wallet's in-app browser, show a prompt.
   const [showFallback, setShowFallback] = useState(false);
   useEffect(() => {
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const isMetaMaskInApp = /MetaMask/i.test(navigator.userAgent);
-    if (isMobile && !isMetaMaskInApp) {
+    const isCoinbaseInApp = /Coinbase/i.test(navigator.userAgent);
+    if (isMobile && !isCoinbaseInApp) {
       setShowFallback(true);
     }
   }, []);
@@ -450,24 +449,22 @@ const RedemptionPage = ({ currentAccount }) => {
       {/* Fallback Prompt using react-open-app */}
       {showFallback && (
         <div style={{ padding: "1rem", background: "#fffae6", textAlign: "center" }}>
-          <p>For the best experience, please open this dApp in MetaMask.</p>
+          <p>For the best experience, please open this dApp in Coinbase Wallet.</p>
           <OpenApp
             href={window.location.href}
             android={(() => {
               const currentUrl = window.location.href;
-              const urlWithoutProtocol = currentUrl.replace(/^https?:\/\//, "");
-              const separator = urlWithoutProtocol.includes("?") ? "&" : "?";
-              return `https://metamask.app.link/dapp/${urlWithoutProtocol}${separator}redirected=true`;
+              const encodedUrl = encodeURIComponent(currentUrl);
+              return `intent://cbwallet/dapp?url=${encodedUrl}#Intent;package=org.toshi;scheme=cbwallet;end`;
             })()}
             ios={(() => {
               const currentUrl = window.location.href;
-              const urlWithoutProtocol = currentUrl.replace(/^https?:\/\//, "");
-              const separator = urlWithoutProtocol.includes("?") ? "&" : "?";
-              return `https://metamask.app.link/dapp/${urlWithoutProtocol}${separator}redirected=true`;
+              const encodedUrl = encodeURIComponent(currentUrl);
+              return `cbwallet://dapp?url=${encodedUrl}`;
             })()}
             blank={true}
           >
-            Open in MetaMask
+            Open in Coinbase Wallet
           </OpenApp>
         </div>
       )}
