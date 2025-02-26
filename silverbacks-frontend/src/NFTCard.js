@@ -33,7 +33,12 @@ const NFTCard = ({
                 "https://silverbacksipfs.online/ipfs/"
               )}
               alt={altText}
-              style={{ height: "200px", width: "100%", objectFit: "cover" }}
+              style={{
+                height: "200px",
+                width: "100%",
+                objectFit: "contain", // changed from "cover" to "contain" to show full image
+                backgroundColor: "#000" // optional: add a background to see letterboxing
+              }}
             />
           ) : (
             <p>No image available.</p>
