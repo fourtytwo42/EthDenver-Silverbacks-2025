@@ -267,15 +267,7 @@ const RedemptionPage = ({ currentAccount }) => {
   // 7) Handle QR scan: extract decryption key and decrypt the ephemeral private key
   const handleScan = async (data) => {
     if (data && scanning && pendingTokenId !== null && pendingAction) {
-      let scannedKey = "";
-      if (typeof data === "string") {
-        scannedKey = data;
-      } else if (typeof data === "object") {
-        log(`QR Code scanned raw data: ${JSON.stringify(data)}`);
-        scannedKey = data.text || JSON.stringify(data);
-      } else {
-        scannedKey = String(data);
-      }
+      let scannedKey = data;
       log(`Extracted decryption key from QR code: ${scannedKey}`);
       log(`Original encrypted pk from URL: ${originalEncryptedPk}`);
       try {
@@ -495,9 +487,15 @@ const RedemptionPage = ({ currentAccount }) => {
           <QrReader
             delay={300}
             style={previewStyle}
-            onError={handleError}
-            onScan={handleScan}
-            videoConstraints={{ facingMode: "environment" }}
+            onResult={(result, error) => {
+              if (result) {
+                handleScan(result.text);
+              }
+              if (error) {
+                handleError(error);
+              }
+            }}
+            constraints={{ video: { facingMode: "environment" } }}
           />
           <button
             style={{
