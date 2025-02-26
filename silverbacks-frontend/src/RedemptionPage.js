@@ -49,6 +49,8 @@ const RedemptionPage = ({ currentAccount }) => {
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
+  // New state to store the chosen back camera's deviceId
+  const [backCameraId, setBackCameraId] = useState(null);
 
   const previewStyle = {
     height: 300,
@@ -93,6 +95,29 @@ const RedemptionPage = ({ currentAccount }) => {
       return new ethers.providers.JsonRpcProvider(rpcUrl);
     }
   };
+
+  // Set up the back-facing camera by enumerating devices
+  useEffect(() => {
+    async function chooseBackCamera() {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((device) => device.kind === "videoinput");
+        // Look for a device whose label contains "back" or "rear" (case-insensitive)
+        const backDevice = videoDevices.find((device) =>
+          /back|rear/i.test(device.label)
+        );
+        if (backDevice) {
+          log(`Selected back camera: ${backDevice.label}`);
+          setBackCameraId(backDevice.deviceId);
+        } else {
+          log("No explicit back camera found; falling back to facingMode ideal 'environment'");
+        }
+      } catch (err) {
+        log(`Error enumerating devices: ${err.message}`);
+      }
+    }
+    chooseBackCamera();
+  }, []);
 
   // 1) Load contract addresses
   useEffect(() => {
@@ -273,8 +298,7 @@ const RedemptionPage = ({ currentAccount }) => {
   // 7) Handle QR scan: once a valid result is obtained, close the scanner and process the result.
   const handleScan = async (data) => {
     if (data && pendingTokenId !== null && pendingAction) {
-      // Close the QR scanner immediately
-      setScanning(false);
+      // The scanner is closed immediately by the onResult callback (see below)
       let scannedKey = "";
       if (typeof data === "string") {
         scannedKey = data;
@@ -506,12 +530,9 @@ const RedemptionPage = ({ currentAccount }) => {
               }
             }}
             constraints={{
-              video: {
-                facingMode: { ideal: "environment" },
-                willReadFrequently: true,
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-              }
+              video: backCameraId
+                ? { deviceId: { exact: backCameraId } }
+                : { facingMode: { ideal: "environment" } }
             }}
             videoProps={{
               playsInline: true,
