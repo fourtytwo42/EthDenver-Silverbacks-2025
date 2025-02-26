@@ -449,18 +449,19 @@ const RedemptionPage = ({ currentAccount }) => {
       {/* Fallback Prompt using react-open-app */}
       {showFallback && (
         <div style={{ padding: "1rem", background: "#fffae6", textAlign: "center" }}>
-          <p>For the best experience, please open this dApp in Coinbase Wallet.</p>
+          <p>For the best experience, please open this dApp in Coinbase Wallet's browser.</p>
           <OpenApp
             href={window.location.href}
+            // Use Coinbase Wallet universal deep link for dApp browser
             android={(() => {
               const currentUrl = window.location.href;
               const encodedUrl = encodeURIComponent(currentUrl);
-              return `intent://cbwallet/dapp?url=${encodedUrl}#Intent;package=org.toshi;scheme=cbwallet;end`;
+              return `https://go.cb-w.com/dapp?url=${encodedUrl}`;
             })()}
             ios={(() => {
               const currentUrl = window.location.href;
               const encodedUrl = encodeURIComponent(currentUrl);
-              return `cbwallet://dapp?url=${encodedUrl}`;
+              return `https://go.cb-w.com/dapp?url=${encodedUrl}`;
             })()}
             blank={true}
           >
