@@ -6,9 +6,11 @@ import { useSearchParams } from "react-router-dom";
 import chains from "./chains.json";
 import NFTCard from "./NFTCard";
 import CryptoJS from "crypto-js";
-// Import the BarcodeScannerComponent from react-qr-barcode-scanner
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
+// NEW: Import the MetaMask SDK
+import MetaMaskSDK from "@metamask/sdk";
 
+// Minimal ABIs for interacting with our contracts
 const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
 const nftABI = [
   "function balanceOf(address) view returns (uint256)",
@@ -25,16 +27,20 @@ const vaultABI = [
 ];
 
 const RedemptionPage = ({ currentAccount }) => {
-  // Improved mobile detection for redirection.
+  // Initialize MetaMask SDK to handle deep linking on mobile.
   useEffect(() => {
-    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const isMetaMaskBrowser = /MetaMask|MetaMaskMobile|DappWeb3/i.test(navigator.userAgent);
-    if (isMobile && !isMetaMaskBrowser) {
-      const currentUrl = window.location.href;
-      const urlWithoutProtocol = currentUrl.replace(/^https?:\/\//, '');
-      const metamaskDeepLink = `https://metamask.app.link/dapp/${urlWithoutProtocol}`;
-      window.location.href = metamaskDeepLink;
-    }
+    const MMSDK = new MetaMaskSDK({
+      dappMetadata: {
+        name: "Silverbacks Redemption",
+        url: window.location.href,
+      },
+      // This callback will be triggered if the SDK detects the need for deep linking.
+      openDeeplink: (dappUrl) => {
+        window.location.href = dappUrl;
+      },
+    });
+    const ethereum = MMSDK.getProvider();
+    // No further action is needed—the SDK manages redirection automatically.
   }, []);
 
   // Extract query parameters from the URL
@@ -81,7 +87,7 @@ const RedemptionPage = ({ currentAccount }) => {
     width: 300,
     margin: "0 auto",
     border: "2px solid #fff",
-    borderRadius: "8px"
+    borderRadius: "8px",
   };
 
   // Helper: Get an ethers provider.
@@ -460,7 +466,6 @@ const RedemptionPage = ({ currentAccount }) => {
   return (
     <div className="container">
       <h1 className="center-align">Redemption Page</h1>
-
       {/* Ephemeral Key's NFTs Section */}
       {ownerAddress && (
         <div className="card">
@@ -491,7 +496,6 @@ const RedemptionPage = ({ currentAccount }) => {
           </div>
         </div>
       )}
-
       {/* Connected Wallet's NFTs Section */}
       {currentAccount && (
         <div className="card">
@@ -516,7 +520,6 @@ const RedemptionPage = ({ currentAccount }) => {
           </div>
         </div>
       )}
-
       {/* QR Code Scanner Modal */}
       {scanning && (
         <div
@@ -530,14 +533,14 @@ const RedemptionPage = ({ currentAccount }) => {
             padding: "1rem",
             borderRadius: "8px",
             zIndex: 1000,
-            textAlign: "center"
+            textAlign: "center",
           }}
         >
           <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
             Please scan ephemeral key's QR code
           </h4>
           <BarcodeScannerComponent
-            delay={100}  // Reduced delay for faster QR code detection
+            delay={100}
             width={300}
             height={300}
             stopStream={stopStream}
@@ -548,7 +551,6 @@ const RedemptionPage = ({ currentAccount }) => {
             }
             onUpdate={handleScan}
           />
-          {/* Button to cycle through available cameras if more than one exists */}
           {videoDevices.length > 1 && (
             <button
               style={{
@@ -558,7 +560,7 @@ const RedemptionPage = ({ currentAccount }) => {
                 color: "#fff",
                 border: "none",
                 borderRadius: "4px",
-                cursor: "pointer"
+                cursor: "pointer",
               }}
               onClick={() => {
                 const nextIndex = (selectedCameraIndex + 1) % videoDevices.length;
@@ -578,7 +580,7 @@ const RedemptionPage = ({ currentAccount }) => {
               color: "#fff",
               border: "none",
               borderRadius: "4px",
-              cursor: "pointer"
+              cursor: "pointer",
             }}
             onClick={() => {
               log("QR scanning cancelled by user");
@@ -590,7 +592,6 @@ const RedemptionPage = ({ currentAccount }) => {
           </button>
         </div>
       )}
-
       {/* Debug Log */}
       <div className="card-panel grey darken-3" style={{ color: "white", marginTop: "2rem" }}>
         <h5>Debug Log</h5>
