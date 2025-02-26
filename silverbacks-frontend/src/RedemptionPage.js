@@ -73,7 +73,7 @@ const RedemptionPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
-  // --- getProvider function with network switching based on URL ---
+  // --- Updated getProvider function with network switching and auto-adding ---
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
@@ -84,7 +84,7 @@ const RedemptionPage = ({ currentAccount }) => {
           chains[key].chainName.toLowerCase().includes(urlNetworkParam.toLowerCase())
         );
         if (targetChainKey) {
-          const targetChainId = targetChainKey; // Assuming keys are in hex format (e.g., "0xaa36a7")
+          const targetChainId = targetChainKey; // keys are assumed to be in hex format (e.g., "0xaa36a7")
           const network = await provider.getNetwork();
           const currentChainIdHex = "0x" + network.chainId.toString(16);
           if (currentChainIdHex.toLowerCase() !== targetChainId.toLowerCase()) {
@@ -95,13 +95,44 @@ const RedemptionPage = ({ currentAccount }) => {
                 params: [{ chainId: targetChainId }],
               });
             } catch (switchError) {
-              log("Error switching network: " + switchError.message);
+              // If error indicates the chain is not added, attempt to add it
+              if (switchError.code === 4902) {
+                log(`Network ${targetChainId} not added. Attempting to add new network.`);
+                const chainData = chains[targetChainId];
+                if (chainData) {
+                  const addParams = {
+                    chainId: targetChainId,
+                    chainName: chainData.chainName || "Unknown Network",
+                    rpcUrls: chainData.rpc ? [chainData.rpc] : [],
+                    blockExplorerUrls: chainData.explorer ? [chainData.explorer] : [],
+                    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }
+                  };
+                  try {
+                    await window.ethereum.request({
+                      method: "wallet_addEthereumChain",
+                      params: [addParams],
+                    });
+                    log(`Successfully added network ${targetChainId}. Now switching network.`);
+                    await window.ethereum.request({
+                      method: "wallet_switchEthereumChain",
+                      params: [{ chainId: targetChainId }],
+                    });
+                  } catch (addError) {
+                    log("Error adding new network: " + addError.message);
+                  }
+                } else {
+                  log("Chain data not found for targetChainId: " + targetChainId);
+                }
+              } else {
+                log("Error switching network: " + switchError.message);
+              }
             }
           }
         }
       }
       return provider;
     } else {
+      // Fallback to JSON-RPC provider if no window.ethereum available
       let targetChain;
       if (urlNetworkParam) {
         const chainKeys = Object.keys(chains);
@@ -113,9 +144,8 @@ const RedemptionPage = ({ currentAccount }) => {
         targetChain = "0xaa36a7";
       }
       const rpcUrl =
-        chains[targetChain].rpcUrls &&
-        chains[targetChain].rpcUrls.length > 0
-          ? chains[targetChain].rpcUrls[0]
+        chains[targetChain].rpc && chains[targetChain].rpc.length > 0
+          ? chains[targetChain].rpc
           : null;
       if (!rpcUrl) {
         throw new Error("No RPC URL available for fallback provider on chain " + targetChain);
