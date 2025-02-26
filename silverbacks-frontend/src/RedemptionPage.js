@@ -433,9 +433,10 @@ const RedemptionPage = ({ currentAccount }) => {
                     nft={n}
                     // Pass the formatted dummy pk so that NFTCard shows "Redeem Stablecoin" and "Claim NFT"
                     pk={ephemeralDisplayPk}
-                    handleRedeem={() => initiateAction(n.tokenId, "redeem")}
+                    // FIX: Use handleRedeemTo so that clicking the redeem button properly initiates the process
+                    handleRedeemTo={() => initiateAction(n.tokenId, "redeem")}
                     handleClaimNFT={() => initiateAction(n.tokenId, "claim")}
-                    handleRedeemTo={() => {}}
+                    handleRedeem={() => {}}
                     handleSendNFT={() => {}}
                   />
                 ))}

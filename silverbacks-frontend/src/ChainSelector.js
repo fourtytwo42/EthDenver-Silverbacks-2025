@@ -30,6 +30,7 @@ const ChainSelector = () => {
         setIsSupported(!!chains[chainId]);
       };
       window.ethereum.on("chainChanged", handleChainChanged);
+
       return () => {
         if (window.ethereum.removeListener) {
           window.ethereum.removeListener("chainChanged", handleChainChanged);
@@ -38,28 +39,55 @@ const ChainSelector = () => {
     }
   }, []);
 
+  /**
+   * Build a valid object for MetaMask's wallet_addEthereumChain
+   * from our custom chain data in chains.json.
+   */
+  const buildAddChainParams = (chainIdHex) => {
+    const chainData = chains[chainIdHex];
+    if (!chainData) return null;
+
+    // Some typical fields that MetaMask expects:
+    // - chainId (hex string)
+    // - chainName (no spaces or any format you like)
+    // - rpcUrls (array of strings)
+    // - blockExplorerUrls (array of strings)
+    // - nativeCurrency (object with name, symbol, decimals)
+    return {
+      chainId: chainIdHex,
+      chainName: chainData.chainName || "Unknown Network",
+      rpcUrls: chainData.rpc ? [chainData.rpc] : [],
+      blockExplorerUrls: chainData.explorer ? [chainData.explorer] : [],
+      nativeCurrency: {
+        name: "ETH",       // or "Sepolia ETH" / "Linea ETH" etc.
+        symbol: "ETH",     // or "SEP", "LINEA", etc. as desired
+        decimals: 18
+      }
+    };
+  };
+
   // Attempt to switch to the selected network.
   const switchNetwork = async (targetChainId) => {
     if (!window.ethereum) return;
     try {
+      // First try a direct chain switch.
       await window.ethereum.request({
         method: "wallet_switchEthereumChain",
-        params: [{ chainId: targetChainId }],
+        params: [{ chainId: targetChainId }]
       });
       fetchCurrentChain();
     } catch (switchError) {
-      // If the network is not added, prompt MetaMask to add it.
+      // If the chain is not added in MetaMask, we must "addEthereumChain".
       if (switchError.code === 4902) {
-        const chainData = chains[targetChainId];
-        if (!chainData) {
-          alert("Chain parameters not found. Please select a supported chain.");
+        const addParams = buildAddChainParams(targetChainId);
+        if (!addParams) {
+          alert("Chain parameters not found in chains.json.");
           return;
         }
-        const { contracts, ...paramsWithoutContracts } = chainData;
         try {
           await window.ethereum.request({
             method: "wallet_addEthereumChain",
-            params: [paramsWithoutContracts],
+            params: [addParams]
           });
           fetchCurrentChain();
         } catch (addError) {
@@ -71,7 +99,7 @@ const ChainSelector = () => {
     }
   };
 
-  // Handle chain selection.
+  // Handle chain selection from the dropdown.
   const handleSelectChain = async (chainId) => {
     await switchNetwork(chainId);
   };
@@ -82,8 +110,7 @@ const ChainSelector = () => {
       window.M.Dropdown.init(dropdownTriggerRef.current, {
         coverTrigger: false,
         constrainWidth: false,
-        // Append the dropdown to our container so its positioning is relative to it
-        container: document.querySelector(".chain-selector-container"),
+        container: document.querySelector(".chain-selector-container")
       });
     }
   }, []);
@@ -94,7 +121,7 @@ const ChainSelector = () => {
       style={{
         width: "100%",
         position: "relative",
-        textAlign: "center",
+        textAlign: "center"
       }}
     >
       <button
@@ -105,7 +132,7 @@ const ChainSelector = () => {
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
-          minWidth: "200px",
+          minWidth: "200px"
         }}
       >
         {isSupported
@@ -115,13 +142,17 @@ const ChainSelector = () => {
           arrow_drop_down
         </i>
       </button>
+
       <ul
         id="chainDropdown"
         className="dropdown-content"
         style={{ marginTop: "10px" }}
       >
         {Object.keys(chains).map((chainId) => (
-          <li key={chainId} className={chainId === currentChain ? "active" : ""}>
+          <li
+            key={chainId}
+            className={chainId === currentChain ? "active" : ""}
+          >
             <a href="#!" onClick={() => handleSelectChain(chainId)}>
               {chains[chainId].chainName}
             </a>

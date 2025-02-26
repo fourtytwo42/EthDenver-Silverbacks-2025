@@ -1,21 +1,15 @@
 const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
+require("dotenv").config();
 
 /**
  * Helper function to deploy a contract.
- * @param {ContractFactory} contractFactory - The factory object.
- * @param {string} contractName - A string to use for logging (the contract's name).
- * @param  {...any} args - The constructor arguments.
- *
- * This function estimates the deployment gas cost and logs:
- * - The deployer address,
- * - The estimated cost (in ETH),
- * - And, if an error occurs because the balance is insufficient, the deployer's balance.
  */
 async function deployContract(contractFactory, contractName, ...args) {
   const [deployer] = await ethers.getSigners();
   console.log(`Deploying ${contractName} from address: ${deployer.address}`);
+
   let estimatedGas, gasPrice, estimatedCost;
   try {
     // Prepare the deployment transaction and estimate gas usage.
@@ -29,6 +23,7 @@ async function deployContract(contractFactory, contractName, ...args) {
   } catch (err) {
     console.error("Error estimating gas: ", err.message);
   }
+
   try {
     const instance = await contractFactory.deploy(...args);
     await instance.deployed();
@@ -53,14 +48,12 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Starting deployment with deployer address:", deployer.address);
 
-  // 1) Deploy MyStableCoin (constructor: (string name, string symbol))
+  // 1) Deploy MyStableCoin
   const StableCoinFactory = await ethers.getContractFactory("MyStableCoin");
-  // Pass both the token name and symbol.
   const stableCoin = await deployContract(StableCoinFactory, "MyStableCoin", "MyStableCoin", "MSC");
 
-  // 2) Deploy SilverbacksNFT (constructor: (string name, string symbol))
+  // 2) Deploy SilverbacksNFT
   const SilverbacksNFTFactory = await ethers.getContractFactory("SilverbacksNFT");
-  // Pass both the NFT name and symbol.
   const nft = await deployContract(SilverbacksNFTFactory, "SilverbacksNFT", "SilverbacksNFT", "SBX");
 
   // Set the base URI for NFT metadata.
@@ -68,7 +61,7 @@ async function main() {
   await tx.wait();
   console.log("Base URI set for SilverbacksNFT");
 
-  // 3) Deploy SilverbacksVault (constructor: (address stableCoin, address silverbacksNFT))
+  // 3) Deploy SilverbacksVault
   const SilverbacksVaultFactory = await ethers.getContractFactory("SilverbacksVault");
   const vault = await deployContract(SilverbacksVaultFactory, "SilverbacksVault", stableCoin.address, nft.address);
 
@@ -82,7 +75,7 @@ async function main() {
   await tx.wait();
   console.log("Minted 10000 stablecoins to deployer.");
 
-  // Retrieve additional token details.
+  // Retrieve some details just for logging:
   const stableCoinName = await stableCoin.name();
   const stableCoinSymbol = await stableCoin.symbol();
   const stableCoinDecimals = await stableCoin.decimals();
@@ -93,31 +86,33 @@ async function main() {
   const network = await ethers.provider.getNetwork();
   const chainIdHex = "0x" + network.chainId.toString(16);
 
-  // Define extra chain metadata.
+  // Example chainDataMap with no spaces in chainName
   const chainDataMap = {
-    11155111: { // Sepolia
-      chainName: "sepolia",
+    11155111: {
+      chainName: "sepolia-testnet",      // <--- no spaces
       rpc: process.env.RPC_URL || "",
       explorer: "https://sepolia.etherscan.io"
     },
-    59141: { // Linea Sepolia (using the chain id where you have funds)
-      chainName: "Linea Sepolia",
+    59141: {
+      chainName: "linea-sepolia",       // <--- replaced space with a hyphen
       rpc: process.env.LINEA_RPC_URL || "",
       explorer: "https://sepolia.lineascan.build"
     },
-    31337: { // Hardhat local network
-      chainName: "Hardhat",
+    31337: {
+      chainName: "hardhat",
       rpc: "http://127.0.0.1:8545",
       explorer: ""
     }
   };
+
+  // Fallback if the chain ID isn't recognized:
   const extraChainData = chainDataMap[network.chainId] || {
     chainName: network.name,
     rpc: "",
     explorer: ""
   };
 
-  // Write deployment addresses and metadata to chains.json.
+  // Write deployment addresses to chains.json
   const chainsFilePath = path.join(__dirname, "..", "chains.json");
   let chains = {};
   if (fs.existsSync(chainsFilePath)) {

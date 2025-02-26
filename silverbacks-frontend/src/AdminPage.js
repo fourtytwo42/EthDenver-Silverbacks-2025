@@ -388,9 +388,9 @@ const AdminPage = ({ currentAccount }) => {
       const link = `http://silverbacksethdenver2025.win/?network=${networkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
       csvRows.push(`${wallet.address},${wallet.privateKey},${encryptedPrivateKey},${encryptionKey},${link}`);
       
-      // Generate QR code for the encryption key
+      // Generate QR code for the encryption key with high error correction (H)
       const qrOptions = {
-        errorCorrectionLevel: 'L',
+        errorCorrectionLevel: 'H',
         margin: 1,
         width: 256,
         color: { dark: "#000000", light: "#ffffff" }
@@ -721,7 +721,6 @@ const AdminPage = ({ currentAccount }) => {
                     />
                     <label className="active">Number of Keypairs</label>
                   </div>
-                  {/* Removed manual Network input field */}
                   <div className="col s12 m4">
                     <button onClick={handleGenerateKeys} className="btn waves-effect waves-light">
                       Generate Keypairs

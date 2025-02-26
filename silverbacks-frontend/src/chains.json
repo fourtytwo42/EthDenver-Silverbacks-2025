@@ -1,7 +1,7 @@
 {
   "0xaa36a7": {
     "chainId": "0xaa36a7",
-    "chainName": "Sepolia Testnet",
+    "chainName": "sepolia-testnet",
     "rpcUrls": [
       "https://rpc.sepolia.org"
     ],
@@ -21,7 +21,7 @@
   },
   "0xe705": {
     "chainId": "0xe705",
-    "chainName": "Linea Sepolia",
+    "chainName": "linea-sepolia",
     "rpcUrls": [
       "https://linea-sepolia.infura.io"
     ],
