@@ -1,3 +1,5 @@
+// C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\silverbacks-frontend\src\RedemptionPage.js
+
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
@@ -23,6 +25,22 @@ const vaultABI = [
 ];
 
 const RedemptionPage = ({ currentAccount }) => {
+  // NEW: If the redemption page is opened on a mobile device that is not the MetaMask in-app browser,
+  // redirect the user to MetaMask’s deep link (which will open the MetaMask app or direct to the appropriate store)
+  useEffect(() => {
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    const userAgent = navigator.userAgent || "";
+    const isMetaMaskBrowser = userAgent.includes("MetaMask");
+    if (isMobile && !isMetaMaskBrowser) {
+      // Remove protocol from current URL and prepend metamask.app.link/dapp/
+      const currentUrl = window.location.href;
+      const urlWithoutProtocol = currentUrl.replace(/^https?:\/\//, '');
+      const metamaskDeepLink = `https://metamask.app.link/dapp/${urlWithoutProtocol}`;
+      window.location.href = metamaskDeepLink;
+    }
+  }, []);
+
+  // Extract query parameters from the URL
   const [searchParams] = useSearchParams();
   const originalEncryptedPk = searchParams.get("pk") || "";
   const urlAddress = searchParams.get("address") || "";
@@ -97,36 +115,6 @@ const RedemptionPage = ({ currentAccount }) => {
       return new ethers.providers.JsonRpcProvider(rpcUrl);
     }
   };
-
-  // When scanning starts, enumerate available video devices
-  useEffect(() => {
-    if (scanning) {
-      async function enumerateDevices() {
-        try {
-          // Request video permission so that device labels are available
-          await navigator.mediaDevices.getUserMedia({ video: true });
-          const devices = await navigator.mediaDevices.enumerateDevices();
-          const videoInputs = devices.filter((d) => d.kind === "videoinput");
-          setVideoDevices(videoInputs);
-          if (videoInputs.length > 0) {
-            // Try to choose the back camera by looking for "back" or "rear" in the label
-            const backIndex = videoInputs.findIndex((d) => /back|rear/i.test(d.label));
-            const indexToUse = backIndex >= 0 ? backIndex : 0;
-            setSelectedCameraIndex(indexToUse);
-            setSelectedDeviceId(videoInputs[indexToUse].deviceId);
-            log(`Found ${videoInputs.length} video devices; using device index ${indexToUse} (${videoInputs[indexToUse].label})`);
-          } else {
-            log("No video devices found.");
-          }
-        } catch (err) {
-          log(`Error enumerating video devices: ${err.message}`);
-        }
-      }
-      enumerateDevices();
-      // Reset stopStream in case it was previously set to true
-      setStopStream(false);
-    }
-  }, [scanning]);
 
   // 1) Load contract addresses
   useEffect(() => {
@@ -296,7 +284,37 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // 6) Initiate an action (for ephemeral NFTs) by opening the QR scanner
+  // 6) When scanning starts, enumerate available video devices
+  useEffect(() => {
+    if (scanning) {
+      async function enumerateDevices() {
+        try {
+          // Request video permission so that device labels are available
+          await navigator.mediaDevices.getUserMedia({ video: true });
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoInputs = devices.filter((d) => d.kind === "videoinput");
+          setVideoDevices(videoInputs);
+          if (videoInputs.length > 0) {
+            // Try to choose the back camera by looking for "back" or "rear" in the label
+            const backIndex = videoInputs.findIndex((d) => /back|rear/i.test(d.label));
+            const indexToUse = backIndex >= 0 ? backIndex : 0;
+            setSelectedCameraIndex(indexToUse);
+            setSelectedDeviceId(videoInputs[indexToUse].deviceId);
+            log(`Found ${videoInputs.length} video devices; using device index ${indexToUse} (${videoInputs[indexToUse].label})`);
+          } else {
+            log("No video devices found.");
+          }
+        } catch (err) {
+          log(`Error enumerating video devices: ${err.message}`);
+        }
+      }
+      enumerateDevices();
+      // Reset stopStream in case it was previously set to true
+      setStopStream(false);
+    }
+  }, [scanning]);
+
+  // 7) Initiate an action (for ephemeral NFTs) by opening the QR scanner
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
     setPendingAction(action);
@@ -305,7 +323,7 @@ const RedemptionPage = ({ currentAccount }) => {
     log(`Initiated ${action} for tokenId=${tokenId}. Please scan ephemeral key's QR code.`);
   };
 
-  // 7) Handle QR scan: once a valid result is obtained, immediately close the scanner and process the result.
+  // 8) Handle QR scan: once a valid result is obtained, immediately close the scanner and process the result.
   const handleScan = async (err, result) => {
     if (err) {
       log(`QR Reader error: ${err.message}`);
@@ -353,7 +371,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 8A) Execute action for ephemeral NFTs (redeem or claim)
+  // 9A) Execute action for ephemeral NFTs (redeem or claim)
   const executeAction = async (tokenId, action, ephemeralPrivateKey) => {
     try {
       const ephemeralWallet = new ethers.Wallet(ephemeralPrivateKey);
@@ -396,7 +414,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 8B) For connected wallet NFTs: directly redeem (burn NFT to receive tokens)
+  // 9B) For connected wallet NFTs: directly redeem (burn NFT to receive tokens)
   const handleRedeemConnected = async (tokenId) => {
     if (!window.ethereum) {
       log("MetaMask not available for redeeming connected NFTs.");
@@ -417,7 +435,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 8C) For connected wallet NFTs: send NFT to another address
+  // 9C) For connected wallet NFTs: send NFT to another address
   const handleSendNFT = async (tokenId) => {
     if (!currentAccount || !contractAddresses || !window.ethereum) {
       log("Wallet not connected or MetaMask not available");
