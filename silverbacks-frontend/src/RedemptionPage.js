@@ -507,7 +507,7 @@ const RedemptionPage = ({ currentAccount }) => {
             }}
             constraints={{
               video: {
-                facingMode: { exact: "environment" },
+                facingMode: { ideal: "environment" },
                 willReadFrequently: true,
                 width: { ideal: 1280 },
                 height: { ideal: 720 }
