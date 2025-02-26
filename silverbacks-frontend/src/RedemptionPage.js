@@ -4,7 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import chains from "./chains.json";
 import NFTCard from "./NFTCard";
 import CryptoJS from "crypto-js";
-import QrScanner from "react-qr-scanner";
+import QrScanner from "react-qr-scanner"; // Using react-qr-scanner
 
 // Minimal ABI snippets:
 const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
@@ -25,12 +25,13 @@ const vaultABI = [
 const RedemptionPage = ({ currentAccount }) => {
   const [searchParams] = useSearchParams();
 
-  // Get URL parameters – encrypted pk, ephemeral address, and optional network override.
+  // Get URL parameters – encrypted pk and the ephemeral address
   const originalEncryptedPk = searchParams.get("pk") || "";
   const urlAddress = searchParams.get("address") || "";
   const urlNetworkParam = searchParams.get("network");
 
-  // For display only: format the encrypted pk into a 64‐character hex string.
+  // For display purposes only, format the encrypted pk into a valid hex string.
+  // (This dummy value is only used so NFTCard’s check passes and shows ephemeral buttons.)
   const ephemeralDisplayPk = originalEncryptedPk
     ? (() => {
         const raw = originalEncryptedPk.startsWith("0x")
@@ -40,17 +41,17 @@ const RedemptionPage = ({ currentAccount }) => {
       })()
     : "";
 
-  // The ephemeral NFT owner (from URL)
+  // The ephemeral NFT owner (from the URL)
   const [ownerAddress, setOwnerAddress] = useState("");
   // NFTs owned by the ephemeral address (for redemption)
   const [redeemNfts, setRedeemNfts] = useState([]);
   // NFTs owned by the connected wallet
   const [myNfts, setMyNFTs] = useState([]);
-  // Debug log
+  // Debug logging
   const [logMessages, setLogMessages] = useState([]);
-  // Contract addresses from chains.json for the target chain
+  // Contract addresses from chains.json
   const [contractAddresses, setContractAddresses] = useState(null);
-  // StableCoin balance of the connected wallet
+  // StableCoin balance of connected wallet
   const [erc20Balance, setErc20Balance] = useState(null);
   // For QR scanning and pending actions
   const [scanning, setScanning] = useState(false);
@@ -58,67 +59,76 @@ const RedemptionPage = ({ currentAccount }) => {
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
 
-  // We'll also store our determined target chain key (from chains.json)
-  const [targetChainKey, setTargetChainKey] = useState("0xaa36a7"); // default to sepolia-testnet
-
+  // Logging helper
   const log = (msg) => {
     console.log(msg);
     setLogMessages((prev) => [...prev, msg]);
   };
 
   // --------------------------------------------------------------------------
-  // Determine the target chain key from URL parameter (if provided) or default to "0xaa36a7"
+  // Helper: Get an ethers provider.
+  // If MetaMask (window.ethereum) is available, use it.
+  // Otherwise, fall back to a JSON‐RPC provider using the rpc endpoint from chains.json.
+  // The fallback chain is chosen by matching the URL query parameter "network"
+  // (if provided) or defaults to "0xaa36a7" (typically Sepolia).
   // --------------------------------------------------------------------------
-  useEffect(() => {
-    let foundKey = "0xaa36a7"; // default to sepolia-testnet
-    if (urlNetworkParam) {
-      // Look for a chain in chains.json whose chainName matches (case-insensitive)
-      const keys = Object.keys(chains);
-      for (let key of keys) {
-        if (
-          chains[key].chainName &&
+  const getProvider = async () => {
+    if (window.ethereum) {
+      return new ethers.providers.Web3Provider(window.ethereum);
+    } else {
+      let targetChain;
+      if (urlNetworkParam) {
+        const chainKeys = Object.keys(chains);
+        targetChain = chainKeys.find((key) =>
           chains[key].chainName.toLowerCase().includes(urlNetworkParam.toLowerCase())
-        ) {
-          foundKey = key;
-          break;
-        }
+        );
       }
+      if (!targetChain) {
+        // Default to Sepolia as defined in your chains.json
+        targetChain = "0xaa36a7";
+      }
+      const rpcUrl =
+        chains[targetChain].rpcUrls &&
+        chains[targetChain].rpcUrls.length > 0
+          ? chains[targetChain].rpcUrls[0]
+          : null;
+      if (!rpcUrl) {
+        throw new Error("No RPC URL available for fallback provider on chain " + targetChain);
+      }
+      return new ethers.providers.JsonRpcProvider(rpcUrl);
     }
-    setTargetChainKey(foundKey);
-    log(`Target chain set to ${chains[foundKey].chainName} (${foundKey})`);
-  }, [urlNetworkParam]);
-
-  // --------------------------------------------------------------------------
-  // Fallback provider for reading data even if MetaMask isn't connected.
-  // Uses the first RPC URL from the target chain in chains.json.
-  // --------------------------------------------------------------------------
-  const getFallbackProvider = () => {
-    const chainInfo = chains[targetChainKey];
-    if (
-      chainInfo &&
-      chainInfo.rpcUrls &&
-      chainInfo.rpcUrls.length > 0
-    ) {
-      return new ethers.providers.JsonRpcProvider(chainInfo.rpcUrls[0]);
-    }
-    throw new Error("No RPC URL available for chain " + targetChainKey);
   };
 
   // --------------------------------------------------------------------------
-  // Load contract addresses from chains.json for the target chain.
+  // 1) Load contract addresses from chains.json using the provider (fallback if necessary)
   // --------------------------------------------------------------------------
   useEffect(() => {
-    const chainInfo = chains[targetChainKey];
-    if (chainInfo && chainInfo.contracts) {
-      setContractAddresses(chainInfo.contracts);
-      log(`Loaded contract addresses for ${chainInfo.chainName}`);
-    } else {
-      log(`Contracts not defined for chain ${targetChainKey}`);
+    async function loadContractAddresses() {
+      let provider;
+      try {
+        provider = await getProvider();
+      } catch (err) {
+        log("Error creating provider: " + err.message);
+        return;
+      }
+      try {
+        const network = await provider.getNetwork();
+        const chainIdHex = "0x" + network.chainId.toString(16);
+        if (chains[chainIdHex] && chains[chainIdHex].contracts) {
+          setContractAddresses(chains[chainIdHex].contracts);
+          log(`Loaded contract addresses for chain ${chainIdHex}`);
+        } else {
+          log(`Contracts not defined for chain ${chainIdHex}`);
+        }
+      } catch (error) {
+        log(`Error loading contract addresses: ${error.message}`);
+      }
     }
-  }, [targetChainKey]);
+    loadContractAddresses();
+  }, [urlNetworkParam]);
 
   // --------------------------------------------------------------------------
-  // Store ephemeral NFT owner address from URL (if valid)
+  // 2) Store NFT owner address from URL if provided
   // --------------------------------------------------------------------------
   useEffect(() => {
     if (originalEncryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
@@ -132,7 +142,7 @@ const RedemptionPage = ({ currentAccount }) => {
   }, [originalEncryptedPk, urlAddress]);
 
   // --------------------------------------------------------------------------
-  // Load the connected wallet's ERC20 balance (if MetaMask is available)
+  // 3) Load the connected wallet's ERC20 balance (only if MetaMask is available)
   // --------------------------------------------------------------------------
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
@@ -163,15 +173,15 @@ const RedemptionPage = ({ currentAccount }) => {
   }, [currentAccount, contractAddresses]);
 
   // --------------------------------------------------------------------------
-  // Load ephemeral NFTs for the owner address using the fallback provider.
+  // 4) Load ephemeral key's NFTs (for redemption) from the owner address using fallback provider if needed
   // --------------------------------------------------------------------------
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
     let provider;
     try {
-      provider = getFallbackProvider();
+      provider = await getProvider();
     } catch (err) {
-      log("Error creating fallback provider in loadRedeemNFTs: " + err.message);
+      log("Error creating provider in loadRedeemNFTs: " + err.message);
       return;
     }
     try {
@@ -181,7 +191,7 @@ const RedemptionPage = ({ currentAccount }) => {
         provider
       );
       const count = await nftContract.balanceOf(ownerAddress);
-      log(`Ephemeral address owns ${count.toString()} NFT(s).`);
+      log(`Ephemeral key owns ${count.toString()} NFT(s).`);
       const nftData = [];
       for (let i = 0; i < count.toNumber(); i++) {
         const tokenId = await nftContract.tokenOfOwnerByIndex(ownerAddress, i);
@@ -213,7 +223,7 @@ const RedemptionPage = ({ currentAccount }) => {
         log(`No redeemable NFTs found for ephemeral address ${ownerAddress}`);
       }
     } catch (error) {
-      log(`Error loading ephemeral NFTs: ${error.message}`);
+      log(`Error loading ephemeral key NFTs: ${error.message}`);
     }
   };
 
@@ -224,7 +234,7 @@ const RedemptionPage = ({ currentAccount }) => {
   }, [ownerAddress, contractAddresses]);
 
   // --------------------------------------------------------------------------
-  // Load NFTs for the connected wallet (requires MetaMask)
+  // 5) Load the connected wallet's NFTs (only if MetaMask is available)
   // --------------------------------------------------------------------------
   const loadMyNFTs = async () => {
     if (!currentAccount || !window.ethereum || !contractAddresses) return;
@@ -242,7 +252,7 @@ const RedemptionPage = ({ currentAccount }) => {
         const tokenId = await nftContract.tokenOfOwnerByIndex(currentAccount, i);
         const faceVal = await nftContract.faceValue(tokenId);
         const tokenURI = await nftContract.tokenURI(tokenId);
-        log(`My NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
+        log(`MyWallet NFT => tokenId=${tokenId}, faceValue=${faceVal}, URI=${tokenURI}`);
         let metadata = {};
         try {
           if (tokenURI.startsWith("ipfs://")) {
@@ -279,7 +289,7 @@ const RedemptionPage = ({ currentAccount }) => {
   }, [currentAccount, contractAddresses]);
 
   // --------------------------------------------------------------------------
-  // Initiate an action (redeem/claim) by opening the QR scanner.
+  // 6) Initiate an action (for ephemeral NFTs) by opening the QR scanner
   // --------------------------------------------------------------------------
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
@@ -289,7 +299,7 @@ const RedemptionPage = ({ currentAccount }) => {
   };
 
   // --------------------------------------------------------------------------
-  // Handle QR scan: extract the decryption key and decrypt the ephemeral private key.
+  // 7) Handle QR scan: extract decryption key and decrypt the ephemeral private key
   // --------------------------------------------------------------------------
   const handleScan = async (data) => {
     if (data && scanning && pendingTokenId !== null && pendingAction) {
@@ -297,24 +307,25 @@ const RedemptionPage = ({ currentAccount }) => {
       if (typeof data === "string") {
         scannedKey = data;
       } else if (typeof data === "object") {
-        log(`QR Scanner raw data: ${JSON.stringify(data)}`);
+        log(`QR Code scanned raw data: ${JSON.stringify(data)}`);
         scannedKey = data.text || JSON.stringify(data);
       } else {
         scannedKey = String(data);
       }
-      log(`Extracted decryption key: ${scannedKey}`);
-      log(`Original encrypted pk: ${originalEncryptedPk}`);
+      log(`Extracted decryption key from QR code: ${scannedKey}`);
+      log(`Original encrypted pk from URL: ${originalEncryptedPk}`);
+
       try {
         const iv = CryptoJS.enc.Hex.parse("00000000000000000000000000000000");
         const aesKey = CryptoJS.MD5(scannedKey);
-        log(`Derived AES key (MD5): ${aesKey.toString()}`);
+        log(`Derived AES key (MD5 of scanned key): ${aesKey.toString()}`);
         const decrypted = CryptoJS.AES.decrypt(
           { ciphertext: CryptoJS.enc.Hex.parse(originalEncryptedPk) },
           aesKey,
           { iv, mode: CryptoJS.mode.CTR, padding: CryptoJS.pad.NoPadding }
         );
         const decryptedHex = decrypted.toString(CryptoJS.enc.Hex);
-        log(`Decrypted hex: ${decryptedHex}`);
+        log(`Decrypted hex output: ${decryptedHex}`);
         const ephemeralPk = "0x" + decryptedHex;
         setDecryptedPrivateKey(ephemeralPk);
         log(`Decrypted ephemeral PK: ${ephemeralPk}`);
@@ -325,16 +336,17 @@ const RedemptionPage = ({ currentAccount }) => {
         log(`NFT owner (from URL): ${ownerAddress}`);
 
         if (ephemeralAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
-          log(`ERROR: Ephemeral address ${ephemeralAddress} does not match URL address ${ownerAddress}.`);
+          log(`ERROR: ephemeral address ${ephemeralAddress} does not match URL address ${ownerAddress}. Cannot proceed.`);
           setScanning(false);
           setPendingTokenId(null);
           setPendingAction("");
           return;
         }
-        // Execute the action using the decrypted ephemeral private key.
+
+        // Execute the selected action using the decrypted ephemeral private key.
         await executeAction(pendingTokenId, pendingAction, ephemeralPk);
       } catch (err) {
-        log(`Error during decryption: ${err.message}`);
+        log(`Error during ephemeral PK decryption: ${err.message}`);
       }
       setScanning(false);
       setPendingTokenId(null);
@@ -347,14 +359,16 @@ const RedemptionPage = ({ currentAccount }) => {
   };
 
   // --------------------------------------------------------------------------
-  // Execute action for ephemeral NFTs (redeem or claim)
+  // 8A) Execute action for ephemeral NFTs (redeem or claim)
   // --------------------------------------------------------------------------
   const executeAction = async (tokenId, action, ephemeralPrivateKey) => {
     try {
       const ephemeralWallet = new ethers.Wallet(ephemeralPrivateKey);
-      let msg, signature, tx;
+      let msg;
+      let signature;
+      let tx;
       if (!window.ethereum) {
-        log("MetaMask not available; write operations require a connected wallet.");
+        log("MetaMask not available; using fallback provider for write operations is not supported.");
         return;
       }
       const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -363,8 +377,8 @@ const RedemptionPage = ({ currentAccount }) => {
 
       if (action === "redeem") {
         msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Redeem:", tokenId]);
-        const msgBytes = ethers.utils.arrayify(msg);
-        signature = await ephemeralWallet.signMessage(msgBytes);
+        const messageHashBytes = ethers.utils.arrayify(msg);
+        signature = await ephemeralWallet.signMessage(messageHashBytes);
         log(`Ephemeral signature (redeem): ${signature}`);
         log(`Calling vaultContract.redeemTo(${tokenId}, signature)...`);
         tx = await vaultContract.redeemTo(tokenId, signature);
@@ -375,8 +389,8 @@ const RedemptionPage = ({ currentAccount }) => {
         loadERC20Balance();
       } else if (action === "claim") {
         msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Claim:", tokenId]);
-        const msgBytes = ethers.utils.arrayify(msg);
-        signature = await ephemeralWallet.signMessage(msgBytes);
+        const messageHashBytes = ethers.utils.arrayify(msg);
+        signature = await ephemeralWallet.signMessage(messageHashBytes);
         log(`Ephemeral signature (claim): ${signature}`);
         log(`Calling vaultContract.claimNFT(${tokenId}, signature)...`);
         tx = await vaultContract.claimNFT(tokenId, signature);
@@ -391,7 +405,7 @@ const RedemptionPage = ({ currentAccount }) => {
   };
 
   // --------------------------------------------------------------------------
-  // For connected wallet NFTs: directly redeem (burn NFT to receive tokens)
+  // 8B) For connected wallet NFTs: directly redeem (burn NFT to receive tokens)
   // --------------------------------------------------------------------------
   const handleRedeemConnected = async (tokenId) => {
     if (!window.ethereum) {
@@ -414,7 +428,7 @@ const RedemptionPage = ({ currentAccount }) => {
   };
 
   // --------------------------------------------------------------------------
-  // For connected wallet NFTs: send NFT to another address
+  // 8C) For connected wallet NFTs: send NFT to another address
   // --------------------------------------------------------------------------
   const handleSendNFT = async (tokenId) => {
     if (!currentAccount || !contractAddresses || !window.ethereum) {
@@ -441,7 +455,7 @@ const RedemptionPage = ({ currentAccount }) => {
   };
 
   // --------------------------------------------------------------------------
-  // Preview style for QR scanner
+  // 9) react-qr-scanner preview style
   // --------------------------------------------------------------------------
   const previewStyle = {
     height: 300,
@@ -464,9 +478,7 @@ const RedemptionPage = ({ currentAccount }) => {
           <div className="card-content">
             <span className="card-title">
               Redeeming NFTs for Ephemeral Address:{" "}
-              <code style={{ fontSize: "0.85em", fontFamily: "monospace" }}>
-                {ownerAddress}
-              </code>
+              <code style={{ fontSize: "0.85em", fontFamily: "monospace" }}>{ownerAddress}</code>
             </span>
             {redeemNfts.length > 0 ? (
               <div className="row">
@@ -559,10 +571,7 @@ const RedemptionPage = ({ currentAccount }) => {
       )}
 
       {/* Debug Log */}
-      <div
-        className="card-panel grey darken-3"
-        style={{ color: "white", marginTop: "2rem" }}
-      >
+      <div className="card-panel grey darken-3" style={{ color: "white", marginTop: "2rem" }}>
         <h5>Debug Log</h5>
         {logMessages.map((msg, idx) => (
           <p key={idx} style={{ fontFamily: "monospace", margin: "0.2rem 0" }}>
