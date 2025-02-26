@@ -13,7 +13,7 @@ const NFTCard = ({
   const [showFront, setShowFront] = useState(true);
 
   const toggleImage = () => {
-    setShowFront(!showFront);
+    setShowFront((prev) => !prev);
   };
 
   // Use the front image if available; if back image is missing, fall back to front.
@@ -27,7 +27,9 @@ const NFTCard = ({
       <div className="card">
         <div className="card-image" style={{ position: "relative" }}>
           {displayedImage ? (
+            // Adding a key based on showFront forces the <img> to re-render when toggled.
             <img
+              key={showFront ? "front" : "back"}
               src={displayedImage.replace(
                 "ipfs://",
                 "https://silverbacksipfs.online/ipfs/"
@@ -36,8 +38,8 @@ const NFTCard = ({
               style={{
                 height: "200px",
                 width: "100%",
-                objectFit: "contain", // changed from "cover" to "contain" to show full image
-                backgroundColor: "#000" // optional: add a background to see letterboxing
+                objectFit: "contain", // ensure full image is visible
+                backgroundColor: "#000", // optional background for letterboxing
               }}
             />
           ) : (
