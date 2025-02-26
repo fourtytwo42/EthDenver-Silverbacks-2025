@@ -1,6 +1,6 @@
 // C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\silverbacks-frontend\src\RedemptionPage.js
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
 import chains from "./chains.json";
@@ -37,6 +37,23 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, []);
 
+  // Determine if on a mobile device for styling purposes.
+  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+
+  // Define style for the QR scanner modal.
+  const scannerModalStyle = {
+    position: "fixed",
+    top: isMobile ? "50%" : "20%",
+    left: "50%",
+    transform: isMobile ? "translate(-50%, -50%)" : "translateX(-50%)",
+    width: "320px",
+    backgroundColor: "rgba(0,0,0,0.9)",
+    padding: "1rem",
+    borderRadius: "8px",
+    zIndex: 1000,
+    textAlign: "center"
+  };
+
   // Extract query parameters from the URL
   const [searchParams] = useSearchParams();
   const originalEncryptedPk = searchParams.get("pk") || "";
@@ -68,6 +85,8 @@ const RedemptionPage = ({ currentAccount }) => {
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+  // Ref to ensure we request camera permission only once.
+  const cameraPermissionRequested = useRef(false);
 
   // Logging helper with timestamp
   const log = (msg) => {
@@ -281,18 +300,25 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // 6) When scanning starts, enumerate available video devices
+  // 6) When scanning starts, enumerate available video devices (only request camera permission once)
   useEffect(() => {
-    if (scanning) {
-      async function enumerateDevices() {
+    if (scanning && !cameraPermissionRequested.current) {
+      (async () => {
         try {
-          // Request video permission so that device labels are available
           await navigator.mediaDevices.getUserMedia({ video: true });
+          cameraPermissionRequested.current = true;
+        } catch (err) {
+          log(`Error requesting camera permission: ${err.message}`);
+        }
+      })();
+    }
+    if (scanning) {
+      (async function enumerateDevices() {
+        try {
           const devices = await navigator.mediaDevices.enumerateDevices();
           const videoInputs = devices.filter((d) => d.kind === "videoinput");
           setVideoDevices(videoInputs);
           if (videoInputs.length > 0) {
-            // Try to choose the back camera by looking for "back" or "rear" in the label
             const backIndex = videoInputs.findIndex((d) => /back|rear/i.test(d.label));
             const indexToUse = backIndex >= 0 ? backIndex : 0;
             setSelectedCameraIndex(indexToUse);
@@ -304,9 +330,7 @@ const RedemptionPage = ({ currentAccount }) => {
         } catch (err) {
           log(`Error enumerating video devices: ${err.message}`);
         }
-      }
-      enumerateDevices();
-      // Reset stopStream in case it was previously set to true
+      })();
       setStopStream(false);
     }
   }, [scanning]);
@@ -328,7 +352,6 @@ const RedemptionPage = ({ currentAccount }) => {
     }
     if (result && pendingTokenId !== null && pendingAction) {
       log("QR Reader result received");
-      // Stop the scanner to avoid duplicate processing
       setStopStream(true);
       setScanning(false);
       let scannedKey = "";
@@ -519,25 +542,12 @@ const RedemptionPage = ({ currentAccount }) => {
 
       {/* QR Code Scanner Modal */}
       {scanning && (
-        <div
-          style={{
-            position: "fixed",
-            top: "20%",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "320px",
-            backgroundColor: "rgba(0,0,0,0.9)",
-            padding: "1rem",
-            borderRadius: "8px",
-            zIndex: 1000,
-            textAlign: "center"
-          }}
-        >
+        <div style={scannerModalStyle}>
           <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
             Please scan ephemeral key's QR code
           </h4>
           <BarcodeScannerComponent
-            delay={100}  // Reduced delay for faster QR code detection
+            delay={100} // Reduced delay for faster QR code detection
             width={300}
             height={300}
             stopStream={stopStream}
