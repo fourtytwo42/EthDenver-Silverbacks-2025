@@ -2,6 +2,12 @@ import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
 import ChainSelector from "./ChainSelector";
 
+// Helper to shorten the wallet address (e.g. 0x1234...abcd)
+const shortenAddress = (address) => {
+  if (!address) return "";
+  return address.slice(0, 6) + "..." + address.slice(-4);
+};
+
 const Header = ({ currentAccount, setCurrentAccount }) => {
   useEffect(() => {
     const storedAccount = localStorage.getItem("currentAccount");
@@ -37,7 +43,7 @@ const Header = ({ currentAccount, setCurrentAccount }) => {
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "space-between"
         }}
       >
         {/* Left Section: Logo */}
@@ -46,17 +52,15 @@ const Header = ({ currentAccount, setCurrentAccount }) => {
             Silverbacks
           </Link>
         </div>
-
         {/* Center Section: Chain Selector */}
         <div style={{ flex: 1, textAlign: "center" }}>
           <ChainSelector />
         </div>
-
         {/* Right Section: Wallet Connect/Disconnect */}
         <div>
           {currentAccount ? (
             <button onClick={disconnectWallet} className="btn waves-effect waves-light">
-              Disconnect
+              {shortenAddress(currentAccount)}
             </button>
           ) : (
             <button onClick={connectWallet} className="btn waves-effect waves-light">

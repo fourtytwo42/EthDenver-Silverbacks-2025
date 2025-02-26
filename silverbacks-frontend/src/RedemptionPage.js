@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
 import chains from "./chains.json";
@@ -24,7 +24,6 @@ const RedemptionPage = ({ currentAccount }) => {
   const [searchParams] = useSearchParams();
   const pk = searchParams.get("pk") || "";
   const urlAddress = searchParams.get("address") || "";
-  // The URL will provide the network parameter as a lowercase string with no spaces.
   const urlNetworkParam = searchParams.get("network");
 
   const [ownerAddress, setOwnerAddress] = useState("");
@@ -34,65 +33,31 @@ const RedemptionPage = ({ currentAccount }) => {
   const [contractAddresses, setContractAddresses] = useState(null);
   const [erc20Balance, setErc20Balance] = useState(null);
 
+  // Inline style for address display
+  const addressStyle = { fontSize: "0.85em", fontFamily: "monospace" };
+
+  // Ref for webcam preview.
+  const videoRef = useRef(null);
+
   const log = (msg) => {
     console.log(msg);
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // --- Network Switch Logic ---
-  // The URL parameter (e.g., "lineasepolia") is expected to be already normalized.
+  // Request webcam access on mount.
   useEffect(() => {
-    if (window.ethereum && urlNetworkParam) {
-      let matchingChainId = null;
-      // Loop through supported chains from chains.json.
-      Object.keys(chains).forEach((chainId) => {
-        const chainData = chains[chainId];
-        // Normalize the chain name from chains.json by removing spaces and lowercasing.
-        const normalizedChainName = chainData.chainName.replace(/\s+/g, "").toLowerCase();
-        if (normalizedChainName === urlNetworkParam) {
-          matchingChainId = chainId;
-        }
-      });
-      if (matchingChainId) {
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        provider.getNetwork().then((network) => {
-          const currentChainId = "0x" + network.chainId.toString(16);
-          if (currentChainId !== matchingChainId) {
-            window.ethereum
-              .request({
-                method: "wallet_switchEthereumChain",
-                params: [{ chainId: matchingChainId }],
-              })
-              .then(() => {
-                log("Switched to network " + chains[matchingChainId].chainName);
-              })
-              .catch((error) => {
-                log("Failed to switch network: " + error.message);
-              });
-          }
-        });
-      } else {
-        log("Network parameter '" + urlNetworkParam + "' does not match any supported networks.");
-      }
-    }
-  }, [urlNetworkParam]);
-
-  useEffect(() => {
-    if (pk && ethers.utils.isHexString(pk, 32)) {
+    async function startVideo() {
       try {
-        const wallet = new ethers.Wallet(pk);
-        setOwnerAddress(wallet.address);
-        log("Redeeming NFTs for address: " + wallet.address);
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
       } catch (error) {
-        log("Error creating wallet from provided key: " + error.message);
+        log("Error accessing webcam: " + error.message);
       }
-    } else if (urlAddress && ethers.utils.isAddress(urlAddress)) {
-      setOwnerAddress(urlAddress);
-      log("Displaying NFTs for address: " + urlAddress + " (redeem disabled)");
-    } else {
-      log("No valid wallet address provided in URL. Please add ?address=YOUR_WALLET_ADDRESS");
     }
-  }, [pk, urlAddress]);
+    startVideo();
+  }, []);
 
   useEffect(() => {
     async function loadContractAddresses() {
@@ -114,6 +79,23 @@ const RedemptionPage = ({ currentAccount }) => {
     }
     loadContractAddresses();
   }, []);
+
+  useEffect(() => {
+    if (pk && ethers.utils.isHexString(pk, 32)) {
+      try {
+        const wallet = new ethers.Wallet(pk);
+        setOwnerAddress(wallet.address);
+        log("Redeeming NFTs for address: " + wallet.address);
+      } catch (error) {
+        log("Error creating wallet from provided key: " + error.message);
+      }
+    } else if (urlAddress && ethers.utils.isAddress(urlAddress)) {
+      setOwnerAddress(urlAddress);
+      log("Displaying NFTs for address: " + urlAddress + " (redeem disabled)");
+    } else {
+      log("No valid wallet address provided in URL. Please add ?address=YOUR_WALLET_ADDRESS");
+    }
+  }, [pk, urlAddress]);
 
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
@@ -170,7 +152,7 @@ const RedemptionPage = ({ currentAccount }) => {
           image: metadata.image || null,
           imageBack: metadata.properties ? metadata.properties.imageBack : null,
           name: metadata.name || "",
-          description: metadata.description || "",
+          description: metadata.description || ""
         });
       }
       setRedeemNfts(nftData);
@@ -220,7 +202,7 @@ const RedemptionPage = ({ currentAccount }) => {
           image: metadata.image || null,
           imageBack: metadata.properties ? metadata.properties.imageBack : null,
           name: metadata.name || "",
-          description: metadata.description || "",
+          description: metadata.description || ""
         });
       }
       setMyNFTs(nftData);
@@ -238,7 +220,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // Redeem functions (unchanged)
+  // Redeem functions remain unchanged.
   const handleRedeemTo = async (tokenId) => {
     if (!currentAccount) {
       alert("Please connect your wallet using the header.");
@@ -339,44 +321,17 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  useEffect(() => {
-    if (window.ethereum) {
-      window.ethereum.on("accountsChanged", (accounts) => {
-        if (accounts.length > 0) {
-          log("Account changed to: " + accounts[0]);
-        }
-      });
-      window.ethereum.on("chainChanged", (_chainId) => {
-        log("Chain changed to: " + _chainId);
-        window.location.reload();
-      });
-    }
-  }, []);
-
   return (
     <div className="container">
       <h1 className="center-align">Redemption Page</h1>
-      {contractAddresses && (
-        <div className="card-panel teal lighten-4">
-          <p>
-            <strong>ERC20 Token Address:</strong> {contractAddresses.stableCoin}
-          </p>
-          <p>
-            <strong>ERC721 Token Address:</strong> {contractAddresses.silverbacksNFT}
-          </p>
-          {currentAccount && erc20Balance !== null && (
-            <p>
-              <strong>Your ERC20 Balance:</strong> {erc20Balance} tokens
-            </p>
-          )}
-        </div>
-      )}
-
-      {/* Section for Redeeming NFTs (based on URL ownerAddress) */}
+      {/* Removed wallet and token address info from the page */}
+      {/* Redemption Section for URL-provided address */}
       {ownerAddress && (
         <div className="card">
           <div className="card-content">
-            <span className="card-title">Redeeming NFTs for Address: {ownerAddress}</span>
+            <span className="card-title">
+              Redeeming NFTs for Address: <code style={addressStyle}>{ownerAddress}</code>
+            </span>
             {redeemNfts.length > 0 ? (
               <div className="row">
                 {redeemNfts.map((n) => (
@@ -397,8 +352,7 @@ const RedemptionPage = ({ currentAccount }) => {
           </div>
         </div>
       )}
-
-      {/* Section for Connected Wallet's NFTs */}
+      {/* Connected Wallet's NFTs */}
       {currentAccount && (
         <div className="card">
           <div className="card-content">
@@ -418,12 +372,21 @@ const RedemptionPage = ({ currentAccount }) => {
                 ))}
               </div>
             ) : (
-              <p>No NFTs found in your connected wallet ({currentAccount})</p>
+              <p>No NFTs found in your connected wallet.</p>
             )}
           </div>
         </div>
       )}
-
+      {/* Webcam Section */}
+      <div className="card-panel teal lighten-5" style={{ marginTop: "2rem" }}>
+        <h5>Webcam Preview</h5>
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          style={{ width: "100%", maxHeight: "300px", backgroundColor: "#000" }}
+        />
+      </div>
       {/* Debug Log */}
       <div className="card-panel grey darken-3" style={{ color: "white", marginTop: "2rem" }}>
         <h5>Debug Log</h5>
