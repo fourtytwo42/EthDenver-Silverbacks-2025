@@ -1,3 +1,4 @@
+// src/RedemptionPage.js
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
@@ -24,7 +25,7 @@ const vaultABI = [
 
 const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   // -------------------------------
-  // Helper function: render the network banner.
+  // Helper: Render the network banner (declared before usage)
   // -------------------------------
   const renderNetworkBanner = () => (
     <div
@@ -70,12 +71,14 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
   const [error, setError] = useState("");
-  // Controls for QR scanner
+  // State for network missing prompt
+  const [missingNetworkInfo, setMissingNetworkInfo] = useState(null);
+  // QR scanner controls
   const [stopStream, setStopStream] = useState(false);
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
-  // Controls wallet prompt overlay (always render the component)
+  // Control for wallet prompt overlay (we always render component)
   const [showWalletPrompt, setShowWalletPrompt] = useState(false);
 
   // -------------------------------
@@ -115,9 +118,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   const connectWallet = async () => {
     if (window.ethereum) {
       try {
-        const accounts = await window.ethereum.request({
-          method: "eth_requestAccounts"
-        });
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
         setCurrentAccount(accounts[0]);
         setShowWalletPrompt(false);
       } catch (err) {
@@ -129,7 +130,8 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   };
 
   // -------------------------------
-  // getProvider: returns a provider ensuring network switching if needed.
+  // getProvider: Returns a provider and handles network switching.
+  // If the wallet does not have the network, set missingNetworkInfo.
   // -------------------------------
   const getProvider = async () => {
     if (window.ethereum) {
@@ -145,41 +147,32 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
           const network = await provider.getNetwork();
           const currentChainIdHex = "0x" + network.chainId.toString(16);
           if (currentChainIdHex.toLowerCase() !== targetChainId.toLowerCase()) {
-            log(`Switching network from ${currentChainIdHex} to ${targetChainId}`);
+            log(`Current chain (${currentChainIdHex}) does not match target (${targetChainId}). Attempting to switch...`);
             try {
               await window.ethereum.request({
                 method: "wallet_switchEthereumChain",
                 params: [{ chainId: targetChainId }]
               });
             } catch (switchError) {
+              // If error code is 4902, the chain is not added to the wallet.
               if (switchError.code === 4902) {
-                log(`Network ${targetChainId} not added. Attempting to add network.`);
-                const chainData = chains[targetChainId];
-                if (chainData) {
-                  const addParams = {
-                    chainId: targetChainId,
-                    chainName: chainData.chainName || "Unknown Network",
-                    rpcUrls: chainData.rpc ? [chainData.rpc] : [],
-                    blockExplorerUrls: chainData.explorer ? [chainData.explorer] : [],
-                    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }
-                  };
-                  try {
-                    await window.ethereum.request({
-                      method: "wallet_addEthereumChain",
-                      params: [addParams]
-                    });
-                    log(`Added network ${targetChainId}. Switching now.`);
-                    await window.ethereum.request({
-                      method: "wallet_switchEthereumChain",
-                      params: [{ chainId: targetChainId }]
-                    });
-                  } catch (addError) {
-                    log("Error adding network: " + addError.message);
-                    throw new Error("Failed to add network: " + addError.message);
-                  }
+                log(`Network ${targetChainId} not found in wallet.`);
+                // Determine revoke.cash link based on urlNetworkParam.
+                let revokeLink = "";
+                if (urlNetworkParam && urlNetworkParam.toLowerCase().includes("ethereum-sepolia")) {
+                  revokeLink = "https://revoke.cash/learn/wallets/add-network/ethereum-sepolia";
+                } else if (urlNetworkParam && urlNetworkParam.toLowerCase().includes("linea-sepolia")) {
+                  revokeLink = "https://revoke.cash/learn/wallets/add-network/linea-sepolia";
+                }
+                if (revokeLink) {
+                  setMissingNetworkInfo({
+                    link: revokeLink,
+                    network: chains[targetChainId].chainName
+                  });
+                  // Return provider even though network is not switched
+                  return provider;
                 } else {
-                  log("Chain data not found for " + targetChainId);
-                  throw new Error("Chain data missing for " + targetChainId);
+                  throw new Error("Network missing and no revoke.cash link available.");
                 }
               } else {
                 log("Error switching network: " + switchError.message);
@@ -191,7 +184,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       }
       return provider;
     } else {
-      // Fallback to a JSON-RPC provider (defaulting to Sepolia)
+      // Fallback JSON-RPC provider (default to Sepolia)
       let targetChain = "0xaa36a7";
       const rpcUrl =
         chains[targetChain] &&
@@ -206,6 +199,39 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       return new ethers.providers.JsonRpcProvider(rpcUrl);
     }
   };
+
+  // -------------------------------
+  // Listen for chain changes to clear missing network prompt if added
+  // -------------------------------
+  useEffect(() => {
+    if (window.ethereum) {
+      const handleChainChanged = async (chainId) => {
+        log("Chain changed: " + chainId);
+        // Re-check if current chain now matches target network.
+        try {
+          const provider = await getProvider();
+          const network = await provider.getNetwork();
+          const currentChainIdHex = "0x" + network.chainId.toString(16);
+          const chainKeys = Object.keys(chains);
+          const targetChainKey = chainKeys.find((key) =>
+            chains[key].chainName.toLowerCase().includes(urlNetworkParam.toLowerCase())
+          );
+          if (targetChainKey && currentChainIdHex.toLowerCase() === targetChainKey.toLowerCase()) {
+            log("Required network now added. Clearing missing network prompt.");
+            setMissingNetworkInfo(null);
+          }
+        } catch (e) {
+          log("Error checking chain after change: " + e.message);
+        }
+      };
+      window.ethereum.on("chainChanged", handleChainChanged);
+      return () => {
+        if (window.ethereum.removeListener) {
+          window.ethereum.removeListener("chainChanged", handleChainChanged);
+        }
+      };
+    }
+  }, [urlNetworkParam]);
 
   // -------------------------------
   // Load contract addresses
@@ -536,10 +562,58 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   };
 
   // -------------------------------
+  // Render missing network prompt if needed
+  // -------------------------------
+  const renderMissingNetworkPrompt = () => (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: "100%",
+        backgroundColor: "rgba(255,255,255,0.95)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 3000,
+        textAlign: "center",
+        padding: "1rem"
+      }}
+    >
+      <h2 style={{ marginBottom: "1rem" }}>Network Not Added</h2>
+      <p style={{ marginBottom: "1rem", padding: "0 1rem" }}>
+        Your wallet does not have the {missingNetworkInfo.network} network added.
+        Please visit{" "}
+        <a href={missingNetworkInfo.link} target="_blank" rel="noopener noreferrer">
+          {missingNetworkInfo.link}
+        </a>{" "}
+        to add it to your wallet, then click "Refresh".
+      </p>
+      <button
+        style={{
+          padding: "1rem 2rem",
+          fontSize: "1.2rem",
+          backgroundColor: "#1976d2",
+          color: "#fff",
+          border: "none",
+          borderRadius: "8px",
+          cursor: "pointer"
+        }}
+        onClick={() => window.location.reload()}
+      >
+        Refresh
+      </button>
+    </div>
+  );
+
+  // -------------------------------
   // Main render
   // -------------------------------
   return (
     <div style={{ padding: 0, margin: 0, backgroundColor: "#f9f9f9", minHeight: "100vh" }}>
+      {missingNetworkInfo && renderMissingNetworkPrompt()}
       {renderNetworkBanner()}
       <div style={{ padding: "1rem" }}>
         {/* Wallet Prompt Overlay */}
