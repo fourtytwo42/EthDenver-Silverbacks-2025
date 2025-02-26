@@ -33,7 +33,7 @@ const NFTCard = ({
                 "https://silverbacksipfs.online/ipfs/"
               )}
               alt={altText}
-              style={{ height: "200px", width: "100%", objectFit: "contain" }}
+              style={{ height: "200px", width: "100%", objectFit: "cover" }}
             />
           ) : (
             <p>No image available.</p>
@@ -44,6 +44,8 @@ const NFTCard = ({
               position: "absolute",
               top: "10px",
               right: "10px",
+              zIndex: 100,
+              pointerEvents: "auto",
               backgroundColor: "rgba(0,0,0,0.6)",
               color: "#fff",
               border: "none",
@@ -71,33 +73,21 @@ const NFTCard = ({
           className="card-action"
           style={{ display: "flex", justifyContent: "center", gap: "0.5rem" }}
         >
-          {(pk && ethers.utils.isHexString(pk, 32)) ? (
+          {pk && ethers.utils.isHexString(pk, 32) ? (
             <>
-              <button
-                onClick={() => handleRedeemTo(nft.tokenId)}
-                className="btn green"
-              >
+              <button onClick={() => handleRedeemTo(nft.tokenId)} className="btn green">
                 Redeem Stablecoin
               </button>
-              <button
-                onClick={() => handleClaimNFT(nft.tokenId)}
-                className="btn blue"
-              >
+              <button onClick={() => handleClaimNFT(nft.tokenId)} className="btn blue">
                 Claim NFT
               </button>
             </>
           ) : (
             <>
-              <button
-                onClick={() => handleRedeem(nft.tokenId)}
-                className="btn green"
-              >
+              <button onClick={() => handleRedeem(nft.tokenId)} className="btn green">
                 Redeem NFT
               </button>
-              <button
-                onClick={() => handleSendNFT(nft.tokenId)}
-                className="btn blue"
-              >
+              <button onClick={() => handleSendNFT(nft.tokenId)} className="btn blue">
                 Send NFT
               </button>
             </>

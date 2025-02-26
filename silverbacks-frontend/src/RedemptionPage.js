@@ -1,4 +1,4 @@
-// C:\Users\hendo420\Documents\Github\EthDenver-Silverbacks-2025\silverbacks-frontend\src\RedemptionPage.js
+// src/RedemptionPage.js
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
