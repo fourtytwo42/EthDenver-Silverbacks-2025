@@ -273,7 +273,7 @@ const RedemptionPage = ({ currentAccount }) => {
   // 7) Handle QR scan: once a valid result is obtained, close the scanner and process the result.
   const handleScan = async (data) => {
     if (data && pendingTokenId !== null && pendingAction) {
-      // Immediately close the QR scanner
+      // Close the QR scanner immediately
       setScanning(false);
       let scannedKey = "";
       if (typeof data === "string") {
@@ -498,7 +498,7 @@ const RedemptionPage = ({ currentAccount }) => {
             onResult={(result, error) => {
               if (result) {
                 log("QR Reader result received");
-                // Close the scanner immediately
+                // Close the scanner immediately and process the result
                 setScanning(false);
                 handleScan(result.text);
               } else if (error) {
@@ -507,7 +507,7 @@ const RedemptionPage = ({ currentAccount }) => {
             }}
             constraints={{
               video: {
-                facingMode: "environment",
+                facingMode: { exact: "environment" },
                 willReadFrequently: true,
                 width: { ideal: 1280 },
                 height: { ideal: 720 }
