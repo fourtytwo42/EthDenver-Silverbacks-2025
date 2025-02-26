@@ -26,7 +26,7 @@ const vaultABI = [
 
 const RedemptionPage = ({ currentAccount }) => {
   // --- Fallback Prompt using react-open-app ---
-  // If on mobile but not inside Coinbase Wallet's in-app browser, show a prompt.
+  // If on mobile but not inside Coinbase Wallet’s in-app browser, show a prompt.
   const [showFallback, setShowFallback] = useState(false);
   useEffect(() => {
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
@@ -449,20 +449,14 @@ const RedemptionPage = ({ currentAccount }) => {
       {/* Fallback Prompt using react-open-app */}
       {showFallback && (
         <div style={{ padding: "1rem", background: "#fffae6", textAlign: "center" }}>
-          <p>For the best experience, please open this dApp in Coinbase Wallet's browser.</p>
+          <p>
+            For the best experience, please open this dApp in Coinbase Wallet's dApp browser.
+          </p>
           <OpenApp
             href={window.location.href}
-            // Use Coinbase Wallet universal deep link for dApp browser
-            android={(() => {
-              const currentUrl = window.location.href;
-              const encodedUrl = encodeURIComponent(currentUrl);
-              return `https://go.cb-w.com/dapp?url=${encodedUrl}`;
-            })()}
-            ios={(() => {
-              const currentUrl = window.location.href;
-              const encodedUrl = encodeURIComponent(currentUrl);
-              return `https://go.cb-w.com/dapp?url=${encodedUrl}`;
-            })()}
+            // Construct Coinbase Wallet universal deep link
+            android={`https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(window.location.href)}`}
+            ios={`https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(window.location.href)}`}
             blank={true}
           >
             Open in Coinbase Wallet
