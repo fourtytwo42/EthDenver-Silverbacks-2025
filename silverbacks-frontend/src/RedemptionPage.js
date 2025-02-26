@@ -25,12 +25,11 @@ const vaultABI = [
 ];
 
 const RedemptionPage = ({ currentAccount }) => {
-  // NEW: If the redemption page is opened on a mobile device that is not the MetaMask in-app browser,
-  // redirect the user to MetaMask’s deep link (which will open the MetaMask app or direct to the appropriate store)
+  // NEW: Improved mobile detection for redirection.
   useEffect(() => {
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    const userAgent = navigator.userAgent || "";
-    const isMetaMaskBrowser = userAgent.includes("MetaMask");
+    // Check for MetaMask indicators that are common on mobile (e.g. MetaMask, MetaMaskMobile, DappWeb3)
+    const isMetaMaskBrowser = /MetaMask|MetaMaskMobile|DappWeb3/i.test(navigator.userAgent);
     if (isMobile && !isMetaMaskBrowser) {
       // Remove protocol from current URL and prepend metamask.app.link/dapp/
       const currentUrl = window.location.href;
