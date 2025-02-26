@@ -49,8 +49,9 @@ const RedemptionPage = ({ currentAccount }) => {
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
-  // New state to store the chosen back camera's deviceId
-  const [backCameraId, setBackCameraId] = useState(null);
+  // New state for camera devices
+  const [videoDevices, setVideoDevices] = useState([]);
+  const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
 
   const previewStyle = {
     height: 300,
@@ -96,30 +97,27 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // Set up the back-facing camera by enumerating devices
+  // Enumerate available video devices when the scanner is activated
   useEffect(() => {
-    async function chooseBackCamera() {
-      try {
-        // Request temporary permission to list device labels if not already granted
-        await navigator.mediaDevices.getUserMedia({ video: true });
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter((device) => device.kind === "videoinput");
-        // Look for a device whose label contains "back" or "rear" (case-insensitive)
-        const backDevice = videoDevices.find((device) =>
-          /back|rear/i.test(device.label)
-        );
-        if (backDevice) {
-          log(`Selected back camera: ${backDevice.label}`);
-          setBackCameraId(backDevice.deviceId);
-        } else {
-          log("No explicit back camera found; forcing environment facing camera");
+    if (scanning) {
+      async function getVideoDevices() {
+        try {
+          // Request minimal access to get device labels if not already granted
+          await navigator.mediaDevices.getUserMedia({ video: true });
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const vids = devices.filter((device) => device.kind === "videoinput");
+          setVideoDevices(vids);
+          // Set selected index to the one that includes 'back' or 'rear' in its label, if available
+          const backIndex = vids.findIndex((d) => /back|rear/i.test(d.label));
+          setSelectedCameraIndex(backIndex >= 0 ? backIndex : 0);
+          log(`Found ${vids.length} video devices; using device index ${backIndex >= 0 ? backIndex : 0}`);
+        } catch (err) {
+          log(`Error enumerating video devices: ${err.message}`);
         }
-      } catch (err) {
-        log(`Error enumerating devices: ${err.message}`);
       }
+      getVideoDevices();
     }
-    chooseBackCamera();
-  }, []);
+  }, [scanning]);
 
   // 1) Load contract addresses
   useEffect(() => {
@@ -530,9 +528,11 @@ const RedemptionPage = ({ currentAccount }) => {
                 log(`QR Reader error in onResult: ${error.message}`);
               }
             }}
-            // Force back camera by using exact facingMode constraint
+            // Use selected device if available; otherwise, fallback to forcing back camera
             constraints={{
-              video: { facingMode: { exact: "environment" } }
+              video: backCameraId
+                ? { deviceId: { exact: backCameraId } }
+                : { facingMode: { exact: "environment" } }
             }}
             videoProps={{
               playsInline: true,
@@ -540,9 +540,33 @@ const RedemptionPage = ({ currentAccount }) => {
               muted: true
             }}
           />
+          {/* Button to cycle through available cameras */}
+          {videoDevices.length > 1 && (
+            <button
+              style={{
+                marginTop: "0.5rem",
+                padding: "0.5rem 1rem",
+                backgroundColor: "#555",
+                color: "#fff",
+                border: "none",
+                borderRadius: "4px",
+                cursor: "pointer"
+              }}
+              onClick={() => {
+                // Cycle to the next camera
+                const nextIndex = (selectedCameraIndex + 1) % videoDevices.length;
+                setSelectedCameraIndex(nextIndex);
+                log(`Switching to camera: ${videoDevices[nextIndex].label || "unknown"}`);
+                // Update backCameraId state with the new device's id
+                setBackCameraId(videoDevices[nextIndex].deviceId);
+              }}
+            >
+              Switch Camera
+            </button>
+          )}
           <button
             style={{
-              marginTop: "1rem",
+              marginTop: "0.5rem",
               padding: "0.5rem 1rem",
               backgroundColor: "#1976d2",
               color: "#fff",
