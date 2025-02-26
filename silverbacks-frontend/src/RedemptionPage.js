@@ -7,6 +7,7 @@ import chains from "./chains.json";
 import NFTCard from "./NFTCard";
 import CryptoJS from "crypto-js";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
+import OpenApp from "react-open-app";
 
 // Minimal ABIs for interacting with our contracts
 const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
@@ -25,30 +26,18 @@ const vaultABI = [
 ];
 
 const RedemptionPage = ({ currentAccount }) => {
-  // --- Deep Link Fallback Logic ---
-  // If the user is on mobile (Chrome on Android, for example) but NOT in the MetaMask in‑app browser,
-  // then redirect to the deep‑link URL.
-  // We append a query parameter (redirected=true) so that when the MetaMask app opens your URL,
-  // the redirection code will not run again.
+  // --- Fallback Prompt using react-open-app ---
+  // If on mobile but not inside MetaMask's in-app browser, show a prompt.
+  const [showFallback, setShowFallback] = useState(false);
   useEffect(() => {
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-    // Check if we are inside MetaMask’s in‑app browser by looking for a MetaMask-specific string.
-    // (This string can vary; adjust as needed.)
     const isMetaMaskInApp = /MetaMask/i.test(navigator.userAgent);
-    const urlParams = new URLSearchParams(window.location.search);
-    if (isMobile && !isMetaMaskInApp && !urlParams.has("redirected")) {
-      const currentUrl = window.location.href;
-      // Remove the protocol
-      const urlWithoutProtocol = currentUrl.replace(/^https?:\/\//, "");
-      // Decide whether to append ?redirected=true or &redirected=true depending on current query params.
-      const separator = urlWithoutProtocol.includes("?") ? "&" : "?";
-      const deepLink = `https://metamask.app.link/dapp/${urlWithoutProtocol}${separator}redirected=true`;
-      window.location.href = deepLink;
+    if (isMobile && !isMetaMaskInApp) {
+      setShowFallback(true);
     }
   }, []);
 
-  // --- The rest of the RedemptionPage component remains unchanged ---
-  // Extract query parameters from the URL
+  // --- Query Parameters & Ephemeral PK Display ---
   const [searchParams] = useSearchParams();
   const originalEncryptedPk = searchParams.get("pk") || "";
   const urlAddress = searchParams.get("address") || "";
@@ -63,7 +52,7 @@ const RedemptionPage = ({ currentAccount }) => {
       })()
     : "";
 
-  // State variables
+  // --- State Variables ---
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNFTs] = useState([]);
   const [myNfts, setMyNFTs] = useState([]);
@@ -74,28 +63,20 @@ const RedemptionPage = ({ currentAccount }) => {
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
-  // State for QR scanner controls
+  // QR Scanner controls
   const [stopStream, setStopStream] = useState(false);
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
 
-  // Logging helper with timestamp
+  // --- Logging Helper ---
   const log = (msg) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${msg}`);
     setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
-  const previewStyle = {
-    height: 300,
-    width: 300,
-    margin: "0 auto",
-    border: "2px solid #fff",
-    borderRadius: "8px",
-  };
-
-  // Helper: Get an ethers provider.
+  // --- Helper: ethers Provider ---
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
@@ -124,7 +105,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 1) Load contract addresses
+  // --- 1) Load Contract Addresses ---
   useEffect(() => {
     async function loadContractAddresses() {
       try {
@@ -145,7 +126,7 @@ const RedemptionPage = ({ currentAccount }) => {
     loadContractAddresses();
   }, [urlNetworkParam]);
 
-  // 2) Store NFT owner address from URL if provided
+  // --- 2) Set NFT Owner Address from URL ---
   useEffect(() => {
     if (originalEncryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
       setOwnerAddress(urlAddress);
@@ -155,7 +136,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [originalEncryptedPk, urlAddress]);
 
-  // 3) Load connected wallet's ERC20 balance
+  // --- 3) Load Connected Wallet's ERC20 Balance ---
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
     if (!window.ethereum) {
@@ -184,7 +165,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // 4) Load ephemeral key's NFTs
+  // --- 4) Load Ephemeral Key's NFTs ---
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
     try {
@@ -238,7 +219,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [ownerAddress, contractAddresses]);
 
-  // 5) Load connected wallet's NFTs
+  // --- 5) Load Connected Wallet's NFTs ---
   const loadMyNFTs = async () => {
     if (!currentAccount || !window.ethereum || !contractAddresses) return;
     try {
@@ -292,18 +273,16 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // 6) When scanning starts, enumerate available video devices
+  // --- 6) Enumerate Video Devices when Scanning ---
   useEffect(() => {
     if (scanning) {
       async function enumerateDevices() {
         try {
-          // Request video permission so that device labels are available
           await navigator.mediaDevices.getUserMedia({ video: true });
           const devices = await navigator.mediaDevices.enumerateDevices();
           const videoInputs = devices.filter((d) => d.kind === "videoinput");
           setVideoDevices(videoInputs);
           if (videoInputs.length > 0) {
-            // Try to choose the back camera by looking for "back" or "rear" in the label
             const backIndex = videoInputs.findIndex((d) => /back|rear/i.test(d.label));
             const indexToUse = backIndex >= 0 ? backIndex : 0;
             setSelectedCameraIndex(indexToUse);
@@ -317,12 +296,11 @@ const RedemptionPage = ({ currentAccount }) => {
         }
       }
       enumerateDevices();
-      // Reset stopStream in case it was previously set to true
       setStopStream(false);
     }
   }, [scanning]);
 
-  // 7) Initiate an action (for ephemeral NFTs) by opening the QR scanner
+  // --- 7) Initiate Action via QR Scanner ---
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
     setPendingAction(action);
@@ -331,7 +309,7 @@ const RedemptionPage = ({ currentAccount }) => {
     log(`Initiated ${action} for tokenId=${tokenId}. Please scan ephemeral key's QR code.`);
   };
 
-  // 8) Handle QR scan: once a valid result is obtained, immediately close the scanner and process the result.
+  // --- 8) Handle QR Scan ---
   const handleScan = async (err, result) => {
     if (err) {
       log(`QR Reader error: ${err.message}`);
@@ -339,7 +317,6 @@ const RedemptionPage = ({ currentAccount }) => {
     }
     if (result && pendingTokenId !== null && pendingAction) {
       log("QR Reader result received");
-      // Stop the scanner to avoid duplicate processing
       setStopStream(true);
       setScanning(false);
       let scannedKey = "";
@@ -379,7 +356,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 9A) Execute action for ephemeral NFTs (redeem or claim)
+  // --- 9A) Execute Action for Ephemeral NFTs ---
   const executeAction = async (tokenId, action, ephemeralPrivateKey) => {
     try {
       const ephemeralWallet = new ethers.Wallet(ephemeralPrivateKey);
@@ -422,7 +399,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 9B) For connected wallet NFTs: directly redeem (burn NFT to receive tokens)
+  // --- 9B) Redeem Connected Wallet NFT ---
   const handleRedeemConnected = async (tokenId) => {
     if (!window.ethereum) {
       log("MetaMask not available for redeeming connected NFTs.");
@@ -443,7 +420,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 9C) For connected wallet NFTs: send NFT to another address
+  // --- 9C) Send Connected Wallet NFT ---
   const handleSendNFT = async (tokenId) => {
     if (!currentAccount || !contractAddresses || !window.ethereum) {
       log("Wallet not connected or MetaMask not available");
@@ -470,6 +447,30 @@ const RedemptionPage = ({ currentAccount }) => {
 
   return (
     <div className="container">
+      {/* Fallback Prompt using react-open-app */}
+      {showFallback && (
+        <div style={{ padding: "1rem", background: "#fffae6", textAlign: "center" }}>
+          <p>For the best experience, please open this dApp in MetaMask.</p>
+          <OpenApp
+            href={window.location.href}
+            android={(() => {
+              const currentUrl = window.location.href;
+              const urlWithoutProtocol = currentUrl.replace(/^https?:\/\//, "");
+              const separator = urlWithoutProtocol.includes("?") ? "&" : "?";
+              return `https://metamask.app.link/dapp/${urlWithoutProtocol}${separator}redirected=true`;
+            })()}
+            ios={(() => {
+              const currentUrl = window.location.href;
+              const urlWithoutProtocol = currentUrl.replace(/^https?:\/\//, "");
+              const separator = urlWithoutProtocol.includes("?") ? "&" : "?";
+              return `https://metamask.app.link/dapp/${urlWithoutProtocol}${separator}redirected=true`;
+            })()}
+            blank={true}
+          >
+            Open in MetaMask
+          </OpenApp>
+        </div>
+      )}
       <h1 className="center-align">Redemption Page</h1>
       {/* Ephemeral Key's NFTs Section */}
       {ownerAddress && (
