@@ -4,7 +4,6 @@ import { useSearchParams } from "react-router-dom";
 import chains from "./chains.json";
 import NFTCard from "./NFTCard";
 import CryptoJS from "crypto-js";
-// Import QrReader as a named export instead of default
 import { QrReader } from "react-qr-reader";
 
 const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
@@ -38,7 +37,7 @@ const RedemptionPage = ({ currentAccount }) => {
     : "";
 
   const [ownerAddress, setOwnerAddress] = useState("");
-  const [redeemNfts, setRedeemNfts] = useState([]);
+  const [redeemNfts, setRedeemNFTs] = useState([]);
   const [myNfts, setMyNFTs] = useState([]);
   const [logMessages, setLogMessages] = useState([]);
   const [contractAddresses, setContractAddresses] = useState(null);
@@ -189,7 +188,7 @@ const RedemptionPage = ({ currentAccount }) => {
           description: metadata.description || ""
         });
       }
-      setRedeemNfts(nftData);
+      setRedeemNFTs(nftData);
       if (nftData.length === 0) {
         log(`No redeemable NFTs found for ephemeral address ${ownerAddress}`);
       }
@@ -498,7 +497,7 @@ const RedemptionPage = ({ currentAccount }) => {
             style={previewStyle}
             onError={handleError}
             onScan={handleScan}
-            facingMode="environment"
+            videoConstraints={{ facingMode: "environment" }}
           />
           <button
             style={{
