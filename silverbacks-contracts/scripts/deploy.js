@@ -1,4 +1,5 @@
 // silverbacks-contracts/scripts/deploy.js
+
 const { ethers } = require("hardhat");
 const fs = require("fs");
 const path = require("path");
@@ -86,22 +87,25 @@ async function main() {
   const network = await ethers.provider.getNetwork();
   const chainIdHex = "0x" + network.chainId.toString(16);
 
-  // Example chainDataMap with no spaces in chainName
+  // Example chainDataMap updated with nativeCurrency details.
   const chainDataMap = {
     11155111: {
-      chainName: "ethereum-sepolia", // updated naming convention
+      chainName: "ethereum-sepolia",
       rpc: process.env.RPC_URL || "",
-      explorer: "https://sepolia.etherscan.io"
+      explorer: "https://sepolia.etherscan.io",
+      nativeCurrency: { name: "SepoliaETH", symbol: "ETH", decimals: 18 }
     },
     59141: {
       chainName: "linea-sepolia",
       rpc: process.env.LINEA_RPC_URL || "",
-      explorer: "https://sepolia.lineascan.build"
+      explorer: "https://sepolia.lineascan.build",
+      nativeCurrency: { name: "LineaETH", symbol: "LineaETH", decimals: 18 }
     },
     31337: {
       chainName: "hardhat",
       rpc: "http://127.0.0.1:8545",
-      explorer: ""
+      explorer: "",
+      nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }
     }
   };
 
@@ -109,7 +113,8 @@ async function main() {
   const extraChainData = chainDataMap[network.chainId] || {
     chainName: network.name,
     rpc: "",
-    explorer: ""
+    explorer: "",
+    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }
   };
 
   // Write deployment addresses to chains.json
@@ -137,6 +142,7 @@ async function main() {
       chainName: extraChainData.chainName,
       rpc: extraChainData.rpc,
       explorer: extraChainData.explorer,
+      nativeCurrency: extraChainData.nativeCurrency,
       contracts: {
         stableCoin: stableCoin.address,
         silverbacksNFT: nft.address,

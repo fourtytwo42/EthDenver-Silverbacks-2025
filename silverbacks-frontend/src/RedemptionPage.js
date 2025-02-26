@@ -1,4 +1,5 @@
 // src/RedemptionPage.js
+
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
@@ -24,9 +25,7 @@ const vaultABI = [
 ];
 
 const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
-  // -------------------------------
-  // Helper: Render the network banner (declared before usage)
-  // -------------------------------
+  // Render a banner showing the target network
   const renderNetworkBanner = () => (
     <div
       style={{
@@ -41,9 +40,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     </div>
   );
 
-  // -------------------------------
-  // Extract query parameters
-  // -------------------------------
+  // Extract URL query parameters
   const [searchParams] = useSearchParams();
   const urlNetworkParam = searchParams.get("network");
   const urlAddress = searchParams.get("address") || "";
@@ -57,9 +54,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       })()
     : "";
 
-  // -------------------------------
   // State variables
-  // -------------------------------
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNFTs] = useState([]);
   const [myNfts, setMyNFTs] = useState([]);
@@ -71,19 +66,14 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
   const [error, setError] = useState("");
-  // State for network missing prompt
   const [missingNetworkInfo, setMissingNetworkInfo] = useState(null);
-  // QR scanner controls
   const [stopStream, setStopStream] = useState(false);
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
-  // Control for wallet prompt overlay (we always render component)
   const [showWalletPrompt, setShowWalletPrompt] = useState(false);
 
-  // -------------------------------
   // Logging helper
-  // -------------------------------
   const log = (msg) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${msg}`);
@@ -91,59 +81,21 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   };
 
   // -------------------------------
-  // Check if wallet is connected on mount
-  // -------------------------------
-  useEffect(() => {
-    async function checkWallet() {
-      if (window.ethereum) {
-        try {
-          const accounts = await window.ethereum.request({ method: "eth_accounts" });
-          if (accounts.length > 0) {
-            setCurrentAccount(accounts[0]);
-            log("Wallet already connected: " + accounts[0]);
-          } else {
-            setShowWalletPrompt(true);
-          }
-        } catch (err) {
-          log("Error checking wallet connection: " + err.message);
-        }
-      }
-    }
-    checkWallet();
-  }, [setCurrentAccount]);
-
-  // -------------------------------
-  // Wallet connect function
-  // -------------------------------
-  const connectWallet = async () => {
-    if (window.ethereum) {
-      try {
-        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-        setCurrentAccount(accounts[0]);
-        setShowWalletPrompt(false);
-      } catch (err) {
-        log("Error connecting wallet: " + err.message);
-      }
-    } else {
-      alert("MetaMask is not installed!");
-    }
-  };
-
-  // -------------------------------
-  // getProvider: Returns a provider and handles network switching.
-  // If the wallet does not have the network, set missingNetworkInfo.
+  // getProvider: Returns a provider and, if a URL network is specified,
+  // attempts to switch MetaMask to that chain.
   // -------------------------------
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       if (urlNetworkParam) {
+        // Look up target chain by matching the network name in chains.json
         const chainKeys = Object.keys(chains);
         const targetChainKey = chainKeys.find((key) =>
           chains[key].chainName.toLowerCase().includes(urlNetworkParam.toLowerCase())
         );
         if (targetChainKey) {
-          const targetChainId = targetChainKey;
+          const targetChainId = targetChainKey; // e.g., "0xe705"
           const network = await provider.getNetwork();
           const currentChainIdHex = "0x" + network.chainId.toString(16);
           if (currentChainIdHex.toLowerCase() !== targetChainId.toLowerCase()) {
@@ -151,29 +103,18 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
             try {
               await window.ethereum.request({
                 method: "wallet_switchEthereumChain",
-                params: [{ chainId: targetChainId }]
+                params: [{ chainId: targetChainId }],
               });
+              // Wait for the network change to propagate
+              await new Promise((resolve) => setTimeout(resolve, 1000));
             } catch (switchError) {
-              // If error code is 4902, the chain is not added to the wallet.
               if (switchError.code === 4902) {
-                log(`Network ${targetChainId} not found in wallet.`);
-                // Determine revoke.cash link based on urlNetworkParam.
-                let revokeLink = "";
-                if (urlNetworkParam && urlNetworkParam.toLowerCase().includes("ethereum-sepolia")) {
-                  revokeLink = "https://revoke.cash/learn/wallets/add-network/ethereum-sepolia";
-                } else if (urlNetworkParam && urlNetworkParam.toLowerCase().includes("linea-sepolia")) {
-                  revokeLink = "https://revoke.cash/learn/wallets/add-network/linea-sepolia";
-                }
-                if (revokeLink) {
-                  setMissingNetworkInfo({
-                    link: revokeLink,
-                    network: chains[targetChainId].chainName
-                  });
-                  // Return provider even though network is not switched
-                  return provider;
-                } else {
-                  throw new Error("Network missing and no revoke.cash link available.");
-                }
+                log(`Network ${targetChainId} is not added to your wallet.`);
+              } else if (
+                switchError.message &&
+                switchError.message.includes("The request has been rejected due to a change in selected network")
+              ) {
+                log("Network switch request rejected due to a change in selected network. Please manually switch to the target network.");
               } else {
                 log("Error switching network: " + switchError.message);
                 throw new Error("Error switching network: " + switchError.message);
@@ -184,7 +125,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       }
       return provider;
     } else {
-      // Fallback JSON-RPC provider (default to Sepolia)
+      // Fallback: use a default JSON-RPC provider (here defaulting to chain "0xaa36a7")
       let targetChain = "0xaa36a7";
       const rpcUrl =
         chains[targetChain] &&
@@ -201,13 +142,42 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   };
 
   // -------------------------------
-  // Listen for chain changes to clear missing network prompt if added
+  // loadContracts: Loads contract addresses based on the current chain.
+  // If an error due to network change occurs, it retries after a delay.
+  // -------------------------------
+  const loadContracts = async () => {
+    try {
+      const provider = await getProvider();
+      const network = await provider.getNetwork();
+      const chainIdHex = "0x" + network.chainId.toString(16);
+      log(`Network chainId: ${chainIdHex}`);
+      if (chains[chainIdHex] && chains[chainIdHex].contracts) {
+        setContractAddresses(chains[chainIdHex].contracts);
+        log(`Loaded contract addresses for chain ${chainIdHex}`);
+      } else {
+        log(`Contracts not defined for chain ${chainIdHex}`);
+      }
+    } catch (err) {
+      log(`Error loading contract addresses: ${err.message}`);
+      if (err.code === "NETWORK_ERROR" || err.message.includes("underlying network changed")) {
+        setTimeout(() => {
+          loadContracts();
+        }, 1000);
+      }
+    }
+  };
+
+  useEffect(() => {
+    loadContracts();
+  }, [urlNetworkParam]);
+
+  // -------------------------------
+  // Listen for chain changes to refresh contracts.
   // -------------------------------
   useEffect(() => {
     if (window.ethereum) {
       const handleChainChanged = async (chainId) => {
         log("Chain changed: " + chainId);
-        // Re-check if current chain now matches target network.
         try {
           const provider = await getProvider();
           const network = await provider.getNetwork();
@@ -219,6 +189,8 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
           if (targetChainKey && currentChainIdHex.toLowerCase() === targetChainKey.toLowerCase()) {
             log("Required network now added. Clearing missing network prompt.");
             setMissingNetworkInfo(null);
+            // Refresh contract addresses once the network is correct.
+            loadContracts();
           }
         } catch (e) {
           log("Error checking chain after change: " + e.message);
@@ -234,31 +206,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   }, [urlNetworkParam]);
 
   // -------------------------------
-  // Load contract addresses
-  // -------------------------------
-  useEffect(() => {
-    async function loadContracts() {
-      try {
-        const provider = await getProvider();
-        const network = await provider.getNetwork();
-        const chainIdHex = "0x" + network.chainId.toString(16);
-        log(`Network chainId: ${chainIdHex}`);
-        if (chains[chainIdHex] && chains[chainIdHex].contracts) {
-          setContractAddresses(chains[chainIdHex].contracts);
-          log(`Loaded contract addresses for chain ${chainIdHex}`);
-        } else {
-          log(`Contracts not defined for chain ${chainIdHex}`);
-        }
-      } catch (err) {
-        log(`Error loading contract addresses: ${err.message}`);
-        setError("Failed to load contract addresses: " + err.message);
-      }
-    }
-    loadContracts();
-  }, [urlNetworkParam]);
-
-  // -------------------------------
-  // Load connected wallet's ERC20 balance
+  // Load ERC20 balance for connected wallet
   // -------------------------------
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
@@ -297,7 +245,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   }, [originalEncryptedPk, urlAddress]);
 
   // -------------------------------
-  // Load ephemeral key's NFTs
+  // Load NFTs owned by the ephemeral address (from URL)
   // -------------------------------
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
@@ -349,7 +297,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   }, [ownerAddress, contractAddresses]);
 
   // -------------------------------
-  // Load connected wallet's NFTs
+  // Load NFTs owned by the connected wallet
   // -------------------------------
   const loadMyNFTs = async () => {
     if (!currentAccount || !contractAddresses) return;
@@ -637,7 +585,17 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
               Please Connect Your Wallet
             </h1>
             <button
-              onClick={connectWallet}
+              onClick={() => {
+                if (window.ethereum) {
+                  window.ethereum
+                    .request({ method: "eth_requestAccounts" })
+                    .then((accounts) => {
+                      setCurrentAccount(accounts[0]);
+                      setShowWalletPrompt(false);
+                    })
+                    .catch((err) => log("Error connecting wallet: " + err.message));
+                }
+              }}
               style={{
                 padding: "1rem 2rem",
                 fontSize: "1.2rem",

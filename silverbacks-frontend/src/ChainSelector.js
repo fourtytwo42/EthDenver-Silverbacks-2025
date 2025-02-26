@@ -41,7 +41,7 @@ const ChainSelector = () => {
     }
   };
 
-  // Build parameters for wallet_addEthereumChain from chains.json.
+  // Build parameters for wallet_addEthereumChain using data from chains.json.
   const buildAddChainParams = (chainIdHex) => {
     const chainData = chains[chainIdHex];
     if (!chainData) return null;
@@ -50,11 +50,7 @@ const ChainSelector = () => {
       chainName: chainData.chainName || "Unknown Network",
       rpcUrls: chainData.rpc ? [chainData.rpc] : [],
       blockExplorerUrls: chainData.explorer ? [chainData.explorer] : [],
-      nativeCurrency: {
-        name: "ETH",
-        symbol: "ETH",
-        decimals: 18,
-      },
+      nativeCurrency: chainData.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 }
     };
   };
 

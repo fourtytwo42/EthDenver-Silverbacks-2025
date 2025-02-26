@@ -2,12 +2,8 @@
   "0xaa36a7": {
     "chainId": "0xaa36a7",
     "chainName": "ethereum-sepolia",
-    "rpcUrls": [
-      "https://rpc.sepolia.org"
-    ],
-    "blockExplorerUrls": [
-      "https://sepolia.etherscan.io"
-    ],
+    "rpc": "https://rpc.sepolia.org",
+    "explorer": "https://sepolia.etherscan.io",
     "nativeCurrency": {
       "name": "SepoliaETH",
       "symbol": "ETH",
@@ -22,12 +18,8 @@
   "0xe705": {
     "chainId": "0xe705",
     "chainName": "linea-sepolia",
-    "rpcUrls": [
-      "https://rpc.sepolia.linea.build"
-    ],
-    "blockExplorerUrls": [
-      "https://sepolia.lineascan.build"
-    ],
+    "rpc": "https://rpc.sepolia.linea.build",
+    "explorer": "https://sepolia.lineascan.build",
     "nativeCurrency": {
       "name": "LineaETH",
       "symbol": "LineaETH",
