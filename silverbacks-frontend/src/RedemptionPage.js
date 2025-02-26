@@ -1,10 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, memo } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
 import chains from "./chains.json";
 import NFTCard from "./NFTCard";
 import CryptoJS from "crypto-js";
+// Import and memoize the QrReader to avoid defaultProps warnings
 import { QrReader } from "react-qr-reader";
+const MemoQrReader = memo(QrReader);
 
 const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
 const nftABI = [
@@ -36,6 +38,7 @@ const RedemptionPage = ({ currentAccount }) => {
       })()
     : "";
 
+  // State variables
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNFTs] = useState([]);
   const [myNfts, setMyNFTs] = useState([]);
@@ -47,14 +50,25 @@ const RedemptionPage = ({ currentAccount }) => {
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
 
+  const previewStyle = {
+    height: 300,
+    width: 300,
+    margin: "0 auto",
+    border: "2px solid #fff",
+    borderRadius: "8px"
+  };
+
+  // Logger with timestamp
   const log = (msg) => {
-    console.log(msg);
-    setLogMessages((prev) => [...prev, msg]);
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${msg}`);
+    setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
   // Helper: Get an ethers provider.
   const getProvider = async () => {
     if (window.ethereum) {
+      log("Using MetaMask provider");
       return new ethers.providers.Web3Provider(window.ethereum);
     } else {
       let targetChain;
@@ -75,6 +89,7 @@ const RedemptionPage = ({ currentAccount }) => {
       if (!rpcUrl) {
         throw new Error("No RPC URL available for fallback provider on chain " + targetChain);
       }
+      log("Using fallback JSON-RPC provider: " + rpcUrl);
       return new ethers.providers.JsonRpcProvider(rpcUrl);
     }
   };
@@ -82,16 +97,11 @@ const RedemptionPage = ({ currentAccount }) => {
   // 1) Load contract addresses
   useEffect(() => {
     async function loadContractAddresses() {
-      let provider;
       try {
-        provider = await getProvider();
-      } catch (err) {
-        log("Error creating provider: " + err.message);
-        return;
-      }
-      try {
+        const provider = await getProvider();
         const network = await provider.getNetwork();
         const chainIdHex = "0x" + network.chainId.toString(16);
+        log(`Network chainId: ${chainIdHex}`);
         if (chains[chainIdHex] && chains[chainIdHex].contracts) {
           setContractAddresses(chains[chainIdHex].contracts);
           log(`Loaded contract addresses for chain ${chainIdHex}`);
@@ -147,14 +157,8 @@ const RedemptionPage = ({ currentAccount }) => {
   // 4) Load ephemeral key's NFTs
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
-    let provider;
     try {
-      provider = await getProvider();
-    } catch (err) {
-      log("Error creating provider in loadRedeemNFTs: " + err.message);
-      return;
-    }
-    try {
+      const provider = await getProvider();
       const nftContract = new ethers.Contract(
         contractAddresses.silverbacksNFT,
         nftABI,
@@ -174,6 +178,7 @@ const RedemptionPage = ({ currentAccount }) => {
             const cid = tokenURI.slice(7);
             const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
             metadata = await response.json();
+            log(`Fetched metadata for tokenId=${tokenId}`);
           }
         } catch (err) {
           log(`Error fetching metadata for token ${tokenId}: ${err.message}`);
@@ -227,6 +232,7 @@ const RedemptionPage = ({ currentAccount }) => {
             const cid = tokenURI.slice(7);
             const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
             metadata = await response.json();
+            log(`Fetched metadata for connected tokenId=${tokenId}`);
           }
         } catch (err) {
           log(`Error fetching metadata for token ${tokenId}: ${err.message}`);
@@ -264,10 +270,20 @@ const RedemptionPage = ({ currentAccount }) => {
     log(`Initiated ${action} for tokenId=${tokenId}. Please scan ephemeral key's QR code.`);
   };
 
-  // 7) Handle QR scan: extract decryption key and decrypt the ephemeral private key
+  // 7) Handle QR scan: once a valid result is obtained, close the scanner and process the result.
   const handleScan = async (data) => {
-    if (data && scanning && pendingTokenId !== null && pendingAction) {
-      let scannedKey = data;
+    if (data && pendingTokenId !== null && pendingAction) {
+      // Immediately close the QR scanner
+      setScanning(false);
+      let scannedKey = "";
+      if (typeof data === "string") {
+        scannedKey = data;
+      } else if (typeof data === "object") {
+        log(`QR Code scanned raw data: ${JSON.stringify(data)}`);
+        scannedKey = data.text || JSON.stringify(data);
+      } else {
+        scannedKey = String(data);
+      }
       log(`Extracted decryption key from QR code: ${scannedKey}`);
       log(`Original encrypted pk from URL: ${originalEncryptedPk}`);
       try {
@@ -290,23 +306,21 @@ const RedemptionPage = ({ currentAccount }) => {
         log(`NFT owner (from URL): ${ownerAddress}`);
         if (ephemeralAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
           log(`ERROR: ephemeral address ${ephemeralAddress} does not match URL address ${ownerAddress}. Cannot proceed.`);
-          setScanning(false);
-          setPendingTokenId(null);
-          setPendingAction("");
           return;
         }
         await executeAction(pendingTokenId, pendingAction, ephemeralPk);
       } catch (err) {
         log(`Error during ephemeral PK decryption: ${err.message}`);
       }
-      setScanning(false);
-      setPendingTokenId(null);
-      setPendingAction("");
     }
   };
 
   const handleError = (err) => {
-    log(`QR Scanner error: ${err.message}`);
+    if (err && err.name && err.message) {
+      log(`QR Reader error in onResult: ${err.message}`);
+    } else {
+      log("QR Scanner encountered an unknown error.");
+    }
   };
 
   // 8A) Execute action for ephemeral NFTs (redeem or claim)
@@ -317,7 +331,7 @@ const RedemptionPage = ({ currentAccount }) => {
       let signature;
       let tx;
       if (!window.ethereum) {
-        log("MetaMask not available; using fallback provider for write operations is not supported.");
+        log("MetaMask not available; cannot perform write operations.");
         return;
       }
       const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -398,14 +412,6 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  const previewStyle = {
-    height: 300,
-    width: 300,
-    margin: "0 auto",
-    border: "2px solid #fff",
-    borderRadius: "8px"
-  };
-
   return (
     <div className="container">
       <h1 className="center-align">Redemption Page</h1>
@@ -416,7 +422,9 @@ const RedemptionPage = ({ currentAccount }) => {
           <div className="card-content">
             <span className="card-title">
               Redeeming NFTs for Ephemeral Address:{" "}
-              <code style={{ fontSize: "0.85em", fontFamily: "monospace" }}>{ownerAddress}</code>
+              <code style={{ fontSize: "0.85em", fontFamily: "monospace" }}>
+                {ownerAddress}
+              </code>
             </span>
             {redeemNfts.length > 0 ? (
               <div className="row">
@@ -469,33 +477,47 @@ const RedemptionPage = ({ currentAccount }) => {
         <div
           style={{
             position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            backgroundColor: "rgba(0,0,0,0.8)",
+            top: "20%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "320px",
+            backgroundColor: "rgba(0,0,0,0.9)",
+            padding: "1rem",
+            borderRadius: "8px",
             zIndex: 1000,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center"
+            textAlign: "center"
           }}
         >
           <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
             Please scan ephemeral key's QR code
           </h4>
-          <QrReader
-            delay={300}
+          <MemoQrReader
+            key="qrreader"
+            delay={500}
             style={previewStyle}
             onResult={(result, error) => {
               if (result) {
+                log("QR Reader result received");
+                // Close the scanner immediately
+                setScanning(false);
                 handleScan(result.text);
-              }
-              if (error) {
-                handleError(error);
+              } else if (error) {
+                log(`QR Reader error in onResult: ${error.message}`);
               }
             }}
-            constraints={{ video: { facingMode: "environment" } }}
+            constraints={{
+              video: {
+                facingMode: "environment",
+                willReadFrequently: true,
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+              }
+            }}
+            videoProps={{
+              playsInline: true,
+              autoPlay: true,
+              muted: true
+            }}
           />
           <button
             style={{
@@ -507,7 +529,10 @@ const RedemptionPage = ({ currentAccount }) => {
               borderRadius: "4px",
               cursor: "pointer"
             }}
-            onClick={() => setScanning(false)}
+            onClick={() => {
+              log("QR scanning cancelled by user");
+              setScanning(false);
+            }}
           >
             Cancel
           </button>
