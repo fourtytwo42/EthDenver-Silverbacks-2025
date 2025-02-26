@@ -23,7 +23,7 @@
     "chainId": "0xe705",
     "chainName": "linea-sepolia",
     "rpcUrls": [
-      "https://linea-sepolia.infura.io"
+      "https://rpc.sepolia.linea.build"
     ],
     "blockExplorerUrls": [
       "https://sepolia.lineascan.build"
