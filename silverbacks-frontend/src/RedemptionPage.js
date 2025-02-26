@@ -6,6 +6,7 @@ import { useSearchParams } from "react-router-dom";
 import chains from "./chains.json";
 import NFTCard from "./NFTCard";
 import CryptoJS from "crypto-js";
+// Import the BarcodeScannerComponent from react-qr-barcode-scanner
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
 
 const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
@@ -36,33 +37,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, []);
 
-  // Determine if on a mobile device for styling purposes.
-  const isMobile = /Mobi|Android/i.test(navigator.userAgent);
-
-  // Full-screen container to center the QR scanner.
-  const modalContainerStyle = {
-    position: "fixed",
-    top: 0,
-    left: 0,
-    width: "100%",
-    height: "100%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
-    zIndex: 1000
-  };
-
-  // Scanner modal styling.
-  const scannerModalStyle = {
-    width: "320px",
-    backgroundColor: "rgba(0,0,0,0.9)",
-    padding: "1rem",
-    borderRadius: "8px",
-    textAlign: "center"
-  };
-
-  // Extract query parameters.
+  // Extract query parameters from the URL
   const [searchParams] = useSearchParams();
   const originalEncryptedPk = searchParams.get("pk") || "";
   const urlAddress = searchParams.get("address") || "";
@@ -77,7 +52,7 @@ const RedemptionPage = ({ currentAccount }) => {
       })()
     : "";
 
-  // State variables.
+  // State variables
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNFTs] = useState([]);
   const [myNfts, setMyNFTs] = useState([]);
@@ -88,35 +63,28 @@ const RedemptionPage = ({ currentAccount }) => {
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
-  // State for QR scanner.
+  // State for QR scanner controls
   const [stopStream, setStopStream] = useState(false);
   const [videoDevices, setVideoDevices] = useState([]);
+  const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
-  // Track if camera permission has been granted.
-  const [hasCameraPermission, setHasCameraPermission] = useState(false);
 
-  // Logging helper.
+  // Logging helper with timestamp
   const log = (msg) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${msg}`);
     setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
-  // Request camera permission once on component mount.
-  useEffect(() => {
-    (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        setHasCameraPermission(true);
-        stream.getTracks().forEach(track => track.stop());
-        log("Camera permission granted.");
-      } catch (err) {
-        log(`Error requesting camera permission: ${err.message}`);
-      }
-    })();
-  }, []);
+  const previewStyle = {
+    height: 300,
+    width: 300,
+    margin: "0 auto",
+    border: "2px solid #fff",
+    borderRadius: "8px"
+  };
 
-  // Helper: Get ethers provider.
+  // Helper: Get an ethers provider.
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
@@ -133,7 +101,8 @@ const RedemptionPage = ({ currentAccount }) => {
         targetChain = "0xaa36a7";
       }
       const rpcUrl =
-        chains[targetChain].rpcUrls && chains[targetChain].rpcUrls.length > 0
+        chains[targetChain].rpcUrls &&
+        chains[targetChain].rpcUrls.length > 0
           ? chains[targetChain].rpcUrls[0]
           : null;
       if (!rpcUrl) {
@@ -144,9 +113,9 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 1) Load contract addresses.
+  // 1) Load contract addresses
   useEffect(() => {
-    (async () => {
+    async function loadContractAddresses() {
       try {
         const provider = await getProvider();
         const network = await provider.getNetwork();
@@ -161,10 +130,11 @@ const RedemptionPage = ({ currentAccount }) => {
       } catch (error) {
         log(`Error loading contract addresses: ${error.message}`);
       }
-    })();
+    }
+    loadContractAddresses();
   }, [urlNetworkParam]);
 
-  // 2) Store NFT owner address from URL.
+  // 2) Store NFT owner address from URL if provided
   useEffect(() => {
     if (originalEncryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
       setOwnerAddress(urlAddress);
@@ -174,7 +144,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [originalEncryptedPk, urlAddress]);
 
-  // 3) Load connected wallet's ERC20 balance.
+  // 3) Load connected wallet's ERC20 balance
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
     if (!window.ethereum) {
@@ -203,7 +173,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // 4) Load ephemeral key's NFTs.
+  // 4) Load ephemeral key's NFTs
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
     try {
@@ -257,7 +227,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [ownerAddress, contractAddresses]);
 
-  // 5) Load connected wallet's NFTs.
+  // 5) Load connected wallet's NFTs
   const loadMyNFTs = async () => {
     if (!currentAccount || !window.ethereum || !contractAddresses) return;
     try {
@@ -311,30 +281,37 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // 6) When scanning starts, simply enumerate available video devices.
+  // 6) When scanning starts, enumerate available video devices
   useEffect(() => {
     if (scanning) {
-      (async function enumerateDevices() {
+      async function enumerateDevices() {
         try {
+          // Request video permission so that device labels are available
+          await navigator.mediaDevices.getUserMedia({ video: true });
           const devices = await navigator.mediaDevices.enumerateDevices();
           const videoInputs = devices.filter((d) => d.kind === "videoinput");
+          setVideoDevices(videoInputs);
           if (videoInputs.length > 0) {
-            setVideoDevices(videoInputs);
-            // Use the first available device.
-            setSelectedDeviceId(videoInputs[0].deviceId);
-            log(`Found ${videoInputs.length} video device(s); using the first device (${videoInputs[0].label}).`);
+            // Try to choose the back camera by looking for "back" or "rear" in the label
+            const backIndex = videoInputs.findIndex((d) => /back|rear/i.test(d.label));
+            const indexToUse = backIndex >= 0 ? backIndex : 0;
+            setSelectedCameraIndex(indexToUse);
+            setSelectedDeviceId(videoInputs[indexToUse].deviceId);
+            log(`Found ${videoInputs.length} video devices; using device index ${indexToUse} (${videoInputs[indexToUse].label})`);
           } else {
             log("No video devices found.");
           }
         } catch (err) {
           log(`Error enumerating video devices: ${err.message}`);
         }
-        setStopStream(false);
-      })();
+      }
+      enumerateDevices();
+      // Reset stopStream in case it was previously set to true
+      setStopStream(false);
     }
   }, [scanning]);
 
-  // 7) Initiate an action (for ephemeral NFTs) by opening the QR scanner.
+  // 7) Initiate an action (for ephemeral NFTs) by opening the QR scanner
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
     setPendingAction(action);
@@ -343,7 +320,7 @@ const RedemptionPage = ({ currentAccount }) => {
     log(`Initiated ${action} for tokenId=${tokenId}. Please scan ephemeral key's QR code.`);
   };
 
-  // 8) Handle QR scan.
+  // 8) Handle QR scan: once a valid result is obtained, immediately close the scanner and process the result.
   const handleScan = async (err, result) => {
     if (err) {
       log(`QR Reader error: ${err.message}`);
@@ -351,9 +328,15 @@ const RedemptionPage = ({ currentAccount }) => {
     }
     if (result && pendingTokenId !== null && pendingAction) {
       log("QR Reader result received");
+      // Stop the scanner to avoid duplicate processing
       setStopStream(true);
       setScanning(false);
-      let scannedKey = typeof result === "object" && result.text ? result.text : String(result);
+      let scannedKey = "";
+      if (typeof result === "object" && result.text) {
+        scannedKey = result.text;
+      } else {
+        scannedKey = String(result);
+      }
       log(`Extracted decryption key from QR code: ${scannedKey}`);
       log(`Original encrypted pk from URL: ${originalEncryptedPk}`);
       try {
@@ -385,7 +368,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 9A) Execute action for ephemeral NFTs (redeem or claim).
+  // 9A) Execute action for ephemeral NFTs (redeem or claim)
   const executeAction = async (tokenId, action, ephemeralPrivateKey) => {
     try {
       const ephemeralWallet = new ethers.Wallet(ephemeralPrivateKey);
@@ -428,7 +411,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 9B) For connected wallet NFTs: directly redeem.
+  // 9B) For connected wallet NFTs: directly redeem (burn NFT to receive tokens)
   const handleRedeemConnected = async (tokenId) => {
     if (!window.ethereum) {
       log("MetaMask not available for redeeming connected NFTs.");
@@ -449,7 +432,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // 9C) For connected wallet NFTs: send NFT.
+  // 9C) For connected wallet NFTs: send NFT to another address
   const handleSendNFT = async (tokenId) => {
     if (!currentAccount || !contractAddresses || !window.ethereum) {
       log("Wallet not connected or MetaMask not available");
@@ -536,42 +519,75 @@ const RedemptionPage = ({ currentAccount }) => {
 
       {/* QR Code Scanner Modal */}
       {scanning && (
-        <div style={modalContainerStyle}>
-          <div style={scannerModalStyle}>
-            <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
-              Please scan ephemeral key's QR code
-            </h4>
-            <BarcodeScannerComponent
-              delay={100} // Faster QR detection
-              width={300}
-              height={300}
-              stopStream={stopStream}
-              videoConstraints={
-                selectedDeviceId
-                  ? { deviceId: { exact: selectedDeviceId } }
-                  : { facingMode: "environment" }
-              }
-              onUpdate={handleScan}
-            />
+        <div
+          style={{
+            position: "fixed",
+            top: "20%",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "320px",
+            backgroundColor: "rgba(0,0,0,0.9)",
+            padding: "1rem",
+            borderRadius: "8px",
+            zIndex: 1000,
+            textAlign: "center"
+          }}
+        >
+          <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
+            Please scan ephemeral key's QR code
+          </h4>
+          <BarcodeScannerComponent
+            delay={100}  // Reduced delay for faster QR code detection
+            width={300}
+            height={300}
+            stopStream={stopStream}
+            videoConstraints={
+              selectedDeviceId
+                ? { deviceId: { exact: selectedDeviceId } }
+                : { facingMode: "environment" }
+            }
+            onUpdate={handleScan}
+          />
+          {/* Button to cycle through available cameras if more than one exists */}
+          {videoDevices.length > 1 && (
             <button
               style={{
                 marginTop: "0.5rem",
                 padding: "0.5rem 1rem",
-                backgroundColor: "#1976d2",
+                backgroundColor: "#555",
                 color: "#fff",
                 border: "none",
                 borderRadius: "4px",
                 cursor: "pointer"
               }}
               onClick={() => {
-                log("QR scanning cancelled by user");
-                setStopStream(true);
-                setScanning(false);
+                const nextIndex = (selectedCameraIndex + 1) % videoDevices.length;
+                setSelectedCameraIndex(nextIndex);
+                setSelectedDeviceId(videoDevices[nextIndex].deviceId);
+                log(`Switching to camera: ${videoDevices[nextIndex].label || "unknown"}`);
               }}
             >
-              Cancel
+              Switch Camera
             </button>
-          </div>
+          )}
+          <button
+            style={{
+              marginTop: "0.5rem",
+              padding: "0.5rem 1rem",
+              backgroundColor: "#1976d2",
+              color: "#fff",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer"
+            }}
+            onClick={() => {
+              log("QR scanning cancelled by user");
+              setStopStream(true);
+              setScanning(false);
+            }}
+          >
+            Cancel
+          </button>
         </div>
       )}
 
