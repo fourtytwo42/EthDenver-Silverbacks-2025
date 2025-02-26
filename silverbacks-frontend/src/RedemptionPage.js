@@ -49,6 +49,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
+  const [error, setError] = useState("");
   // QR scanner controls
   const [stopStream, setStopStream] = useState(false);
   const [videoDevices, setVideoDevices] = useState([]);
@@ -132,6 +133,24 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     );
   }
 
+  // If an error occurred, display it instead of a blank screen
+  if (error) {
+    return (
+      <div
+        style={{
+          padding: "2rem",
+          textAlign: "center",
+          backgroundColor: "#f8d7da",
+          color: "#721c24",
+          minHeight: "100vh"
+        }}
+      >
+        <h2>Error Occurred</h2>
+        <p>{error}</p>
+      </div>
+    );
+  }
+
   // Top banner displaying network name from URL
   const renderNetworkBanner = () => (
     <div
@@ -192,12 +211,15 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                     });
                   } catch (addError) {
                     log("Error adding network: " + addError.message);
+                    throw new Error("Failed to add network: " + addError.message);
                   }
                 } else {
                   log("Chain data not found for " + targetChainId);
+                  throw new Error("Chain data missing for " + targetChainId);
                 }
               } else {
                 log("Error switching network: " + switchError.message);
+                throw new Error("Error switching network: " + switchError.message);
               }
             }
           }
@@ -243,8 +265,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         } else {
           log(`Contracts not defined for chain ${chainIdHex}`);
         }
-      } catch (error) {
-        log(`Error loading contract addresses: ${error.message}`);
+      } catch (err) {
+        log(`Error loading contract addresses: ${err.message}`);
+        setError("Failed to load contract addresses: " + err.message);
       }
     }
     loadContractAddresses();
@@ -314,8 +337,8 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       if (nftData.length === 0) {
         log(`No redeemable NFTs found for ephemeral address ${ownerAddress}`);
       }
-    } catch (error) {
-      log(`Error loading ephemeral key NFTs: ${error.message}`);
+    } catch (err) {
+      log(`Error loading ephemeral key NFTs: ${err.message}`);
     }
   };
 
@@ -364,8 +387,8 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       if (nftData.length === 0) {
         log(`No NFTs found in connected wallet ${currentAccount}`);
       }
-    } catch (error) {
-      log(`Error loading connected wallet NFTs: ${error.message}`);
+    } catch (err) {
+      log(`Error loading connected wallet NFTs: ${err.message}`);
     }
   };
 
@@ -524,6 +547,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
+  // --- Main render ---
   return (
     <div style={{ padding: 0, margin: 0, backgroundColor: "#f9f9f9", minHeight: "100vh" }}>
       {renderNetworkBanner()}
@@ -555,6 +579,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
             )}
           </div>
         )}
+
         {currentAccount && (
           <div style={{ marginBottom: "1rem" }}>
             <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>Your Wallet NFTs</h2>
@@ -576,6 +601,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
             )}
           </div>
         )}
+
         {scanning && (
           <div
             style={{
@@ -647,7 +673,16 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
             </button>
           </div>
         )}
-        <div style={{ marginTop: "2rem", padding: "0.5rem", backgroundColor: "#424242", color: "#fff", fontSize: "0.8rem" }}>
+
+        <div
+          style={{
+            marginTop: "2rem",
+            padding: "0.5rem",
+            backgroundColor: "#424242",
+            color: "#fff",
+            fontSize: "0.8rem"
+          }}
+        >
           <h5>Debug Log</h5>
           {logMessages.map((msg, idx) => (
             <p key={idx} style={{ fontFamily: "monospace", margin: "0.2rem 0" }}>
