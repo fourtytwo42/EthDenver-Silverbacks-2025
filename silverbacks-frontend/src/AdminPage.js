@@ -69,7 +69,7 @@ const AdminPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // Updated network detection: if on mainnet (0x1), switch to Sepolia (0xAA36A7)
+  // Load contract addresses and set network name based on connected chain
   useEffect(() => {
     async function loadContractAddresses() {
       if (window.ethereum) {
@@ -103,7 +103,7 @@ const AdminPage = ({ currentAccount }) => {
 
   // Load stablecoin balance and NFT data for the connected account.
   const loadData = async () => {
-    if (!currentAccount || !window.ethereum || !contractAddresses) return;
+    if (!currentAccount || !contractAddresses) return;
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     const stableCoinContract = new ethers.Contract(
       contractAddresses.stableCoin,
@@ -360,6 +360,8 @@ const AdminPage = ({ currentAccount }) => {
     const csvRows = ["address,privateKey,encryptedPrivateKey,encryptionKey,link"];
     const zip = new JSZip();
     const iv = CryptoJS.enc.Hex.parse("00000000000000000000000000000000");
+    // Use the current domain dynamically
+    const currentDomain = window.location.origin;
     for (let i = 0; i < count; i++) {
       const wallet = ethers.Wallet.createRandom();
       const encryptionKey = generateRandomString(8);
@@ -371,7 +373,8 @@ const AdminPage = ({ currentAccount }) => {
         { iv, mode: CryptoJS.mode.CTR, padding: CryptoJS.pad.NoPadding }
       );
       const encryptedPrivateKey = encrypted.ciphertext.toString(CryptoJS.enc.Hex);
-      const link = `http://silverbacksethdenver2025.win/?network=${networkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
+      // Build the link using the dynamic domain and networkName
+      const link = `${currentDomain}/?network=${networkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
       csvRows.push(`${wallet.address},${wallet.privateKey},${encryptedPrivateKey},${encryptionKey},${link}`);
       const qrOptions = {
         errorCorrectionLevel: 'H',
@@ -661,7 +664,7 @@ const AdminPage = ({ currentAccount }) => {
                   <li>plain private key</li>
                   <li>AES‑CTR encrypted private key (hex)</li>
                   <li>the 8‑character encryption key</li>
-                  <li>a link: <code>http://silverbacksethdenver2025.win/?network=[calculated]&amp;address=&lt;address&gt;&amp;pk=&lt;encryptedPrivateKey&gt;</code></li>
+                  <li>a link: <code>{`${window.location.origin}/?network=[calculated]&address=<address>&pk=<encryptedPrivateKey>`}</code></li>
                   <li>QR code PNG for each key (named with the wallet address)</li>
                 </ul>
                 <div className="row">

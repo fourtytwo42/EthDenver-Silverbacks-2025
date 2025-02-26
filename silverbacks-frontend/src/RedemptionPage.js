@@ -26,7 +26,6 @@ const vaultABI = [
 
 const RedemptionPage = ({ currentAccount }) => {
   // --- Fallback Prompt using react-open-app ---
-  // If on mobile but not inside Coinbase Wallet’s in-app browser, show a prompt.
   const [showFallback, setShowFallback] = useState(false);
   useEffect(() => {
     const isMobile = /Mobi|Android/i.test(navigator.userAgent);
@@ -41,7 +40,6 @@ const RedemptionPage = ({ currentAccount }) => {
   const originalEncryptedPk = searchParams.get("pk") || "";
   const urlAddress = searchParams.get("address") || "";
   const urlNetworkParam = searchParams.get("network");
-
   const ephemeralDisplayPk = originalEncryptedPk
     ? (() => {
         const raw = originalEncryptedPk.startsWith("0x")
@@ -75,11 +73,34 @@ const RedemptionPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
-  // --- Helper: ethers Provider ---
+  // --- getProvider function with network switching based on URL ---
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
-      return new ethers.providers.Web3Provider(window.ethereum);
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      if (urlNetworkParam) {
+        const chainKeys = Object.keys(chains);
+        const targetChainKey = chainKeys.find((key) =>
+          chains[key].chainName.toLowerCase().includes(urlNetworkParam.toLowerCase())
+        );
+        if (targetChainKey) {
+          const targetChainId = targetChainKey; // Assuming keys are in hex format (e.g., "0xaa36a7")
+          const network = await provider.getNetwork();
+          const currentChainIdHex = "0x" + network.chainId.toString(16);
+          if (currentChainIdHex.toLowerCase() !== targetChainId.toLowerCase()) {
+            log(`Switching network from ${currentChainIdHex} to ${targetChainId} as specified in URL`);
+            try {
+              await window.ethereum.request({
+                method: "wallet_switchEthereumChain",
+                params: [{ chainId: targetChainId }],
+              });
+            } catch (switchError) {
+              log("Error switching network: " + switchError.message);
+            }
+          }
+        }
+      }
+      return provider;
     } else {
       let targetChain;
       if (urlNetworkParam) {
@@ -104,7 +125,17 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // --- 1) Load Contract Addresses ---
+  // --- 2) Set NFT Owner Address from URL ---
+  useEffect(() => {
+    if (originalEncryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
+      setOwnerAddress(urlAddress);
+      log(`NFT owner (from URL): ${urlAddress}`);
+    } else {
+      log("No valid ephemeral wallet address in URL. Provide ?address=YOUR_WALLET_ADDRESS&pk=ENCRYPTED_KEY");
+    }
+  }, [originalEncryptedPk, urlAddress]);
+
+  // --- 3) Load Contract Addresses ---
   useEffect(() => {
     async function loadContractAddresses() {
       try {
@@ -125,17 +156,7 @@ const RedemptionPage = ({ currentAccount }) => {
     loadContractAddresses();
   }, [urlNetworkParam]);
 
-  // --- 2) Set NFT Owner Address from URL ---
-  useEffect(() => {
-    if (originalEncryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
-      setOwnerAddress(urlAddress);
-      log(`NFT owner (from URL): ${urlAddress}`);
-    } else {
-      log("No valid ephemeral wallet address in URL. Provide ?address=YOUR_WALLET_ADDRESS&pk=ENCRYPTED_KEY");
-    }
-  }, [originalEncryptedPk, urlAddress]);
-
-  // --- 3) Load Connected Wallet's ERC20 Balance ---
+  // --- 4) Load Connected Wallet's ERC20 Balance ---
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
     if (!window.ethereum) {
@@ -144,11 +165,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const stableCoinContract = new ethers.Contract(
-        contractAddresses.stableCoin,
-        stableCoinABI,
-        provider
-      );
+      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
       const balance = await stableCoinContract.balanceOf(currentAccount);
       const formatted = ethers.utils.formatEther(balance);
       log(`Connected wallet ERC20 balance: ${formatted}`);
@@ -164,16 +181,12 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // --- 4) Load Ephemeral Key's NFTs ---
+  // --- 5) Load Ephemeral Key's NFTs ---
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
     try {
       const provider = await getProvider();
-      const nftContract = new ethers.Contract(
-        contractAddresses.silverbacksNFT,
-        nftABI,
-        provider
-      );
+      const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
       const count = await nftContract.balanceOf(ownerAddress);
       log(`Ephemeral key owns ${count.toString()} NFT(s).`);
       const nftData = [];
@@ -218,16 +231,12 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [ownerAddress, contractAddresses]);
 
-  // --- 5) Load Connected Wallet's NFTs ---
+  // --- 6) Load Connected Wallet's NFTs ---
   const loadMyNFTs = async () => {
     if (!currentAccount || !window.ethereum || !contractAddresses) return;
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const nftContract = new ethers.Contract(
-        contractAddresses.silverbacksNFT,
-        nftABI,
-        provider
-      );
+      const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
       const count = await nftContract.balanceOf(currentAccount);
       log(`Connected wallet owns ${count.toString()} NFT(s).`);
       const nftData = [];
@@ -272,7 +281,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // --- 6) Enumerate Video Devices when Scanning ---
+  // --- 7) Enumerate Video Devices when Scanning ---
   useEffect(() => {
     if (scanning) {
       async function enumerateDevices() {
@@ -299,7 +308,7 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   }, [scanning]);
 
-  // --- 7) Initiate Action via QR Scanner ---
+  // --- 8) Initiate Action via QR Scanner ---
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
     setPendingAction(action);
@@ -308,7 +317,7 @@ const RedemptionPage = ({ currentAccount }) => {
     log(`Initiated ${action} for tokenId=${tokenId}. Please scan ephemeral key's QR code.`);
   };
 
-  // --- 8) Handle QR Scan ---
+  // --- 9) Handle QR Scan ---
   const handleScan = async (err, result) => {
     if (err) {
       log(`QR Reader error: ${err.message}`);
@@ -454,7 +463,6 @@ const RedemptionPage = ({ currentAccount }) => {
           </p>
           <OpenApp
             href={window.location.href}
-            // Construct Coinbase Wallet universal deep link
             android={`https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(window.location.href)}`}
             ios={`https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(window.location.href)}`}
             blank={true}
