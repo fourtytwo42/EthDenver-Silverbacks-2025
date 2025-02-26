@@ -1,3 +1,5 @@
+// silverbacks-frontend/src/AdminPage.js
+
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { create } from "ipfs-http-client";
@@ -373,8 +375,10 @@ const AdminPage = ({ currentAccount }) => {
         { iv, mode: CryptoJS.mode.CTR, padding: CryptoJS.pad.NoPadding }
       );
       const encryptedPrivateKey = encrypted.ciphertext.toString(CryptoJS.enc.Hex);
-      // Build the link using the dynamic domain and networkName
-      const link = `${currentDomain}/?network=${networkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
+      // Build the dApp URL using the dynamic domain, network name, wallet address and encrypted pk
+      const dappUrl = `${currentDomain}/?network=${networkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
+      // Now build a deep link that will directly open Coinbase Wallet using its deep link format.
+      const link = `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(dappUrl)}`;
       csvRows.push(`${wallet.address},${wallet.privateKey},${encryptedPrivateKey},${encryptionKey},${link}`);
       const qrOptions = {
         errorCorrectionLevel: 'H',
@@ -624,7 +628,7 @@ const AdminPage = ({ currentAccount }) => {
                             <p><strong>Token ID:</strong> {n.tokenId}</p>
                             <p><strong>Face Value:</strong> {n.faceValue} USD</p>
                           </div>
-                          <div className="card-action">
+                          <div className="card-action" style={{ display: "flex", justifyContent: "center", gap: "0.5rem" }}>
                             <button onClick={() => handleBurn(n.tokenId)} className="btn red lighten-1">
                               Burn &amp; Redeem
                             </button>
