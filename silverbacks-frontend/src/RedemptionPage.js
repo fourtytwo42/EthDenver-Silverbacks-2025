@@ -7,8 +7,6 @@ import chains from "./chains.json";
 import NFTCard from "./NFTCard";
 import CryptoJS from "crypto-js";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
-// NEW: Import the MetaMask SDK
-import MetaMaskSDK from "@metamask/sdk";
 
 // Minimal ABIs for interacting with our contracts
 const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
@@ -27,22 +25,29 @@ const vaultABI = [
 ];
 
 const RedemptionPage = ({ currentAccount }) => {
-  // Initialize MetaMask SDK to handle deep linking on mobile.
+  // --- Deep Link Fallback Logic ---
+  // If the user is on mobile (Chrome on Android, for example) but NOT in the MetaMask in‑app browser,
+  // then redirect to the deep‑link URL.
+  // We append a query parameter (redirected=true) so that when the MetaMask app opens your URL,
+  // the redirection code will not run again.
   useEffect(() => {
-    const MMSDK = new MetaMaskSDK({
-      dappMetadata: {
-        name: "Silverbacks Redemption",
-        url: window.location.href,
-      },
-      // This callback will be triggered if the SDK detects the need for deep linking.
-      openDeeplink: (dappUrl) => {
-        window.location.href = dappUrl;
-      },
-    });
-    const ethereum = MMSDK.getProvider();
-    // No further action is needed—the SDK manages redirection automatically.
+    const isMobile = /Mobi|Android/i.test(navigator.userAgent);
+    // Check if we are inside MetaMask’s in‑app browser by looking for a MetaMask-specific string.
+    // (This string can vary; adjust as needed.)
+    const isMetaMaskInApp = /MetaMask/i.test(navigator.userAgent);
+    const urlParams = new URLSearchParams(window.location.search);
+    if (isMobile && !isMetaMaskInApp && !urlParams.has("redirected")) {
+      const currentUrl = window.location.href;
+      // Remove the protocol
+      const urlWithoutProtocol = currentUrl.replace(/^https?:\/\//, "");
+      // Decide whether to append ?redirected=true or &redirected=true depending on current query params.
+      const separator = urlWithoutProtocol.includes("?") ? "&" : "?";
+      const deepLink = `https://metamask.app.link/dapp/${urlWithoutProtocol}${separator}redirected=true`;
+      window.location.href = deepLink;
+    }
   }, []);
 
+  // --- The rest of the RedemptionPage component remains unchanged ---
   // Extract query parameters from the URL
   const [searchParams] = useSearchParams();
   const originalEncryptedPk = searchParams.get("pk") || "";
