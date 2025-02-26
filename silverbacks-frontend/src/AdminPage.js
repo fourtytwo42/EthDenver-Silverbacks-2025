@@ -45,6 +45,7 @@ const AdminPage = ({ currentAccount }) => {
   const [activeTab, setActiveTab] = useState("mintSelf");
   const [keysToGenerate, setKeysToGenerate] = useState("1");
   const [generatedCSV, setGeneratedCSV] = useState(null);
+  // networkName is initially set from loadContractAddresses
   const [networkName, setNetworkName] = useState("main");
   // New states for testing decryption
   const [testURL, setTestURL] = useState("");
@@ -354,6 +355,18 @@ const AdminPage = ({ currentAccount }) => {
 
   // --- New: Keypair & Link Generation with QR Codes ---
   const handleGenerateKeys = async () => {
+    // Recalculate the current network name at CSV generation time.
+    let currentNetworkName = networkName;
+    if (window.ethereum) {
+      try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const net = await provider.getNetwork();
+        const chainIdHex = "0x" + net.chainId.toString(16);
+        currentNetworkName = chains[chainIdHex]?.chainName || networkName;
+      } catch (e) {
+        log("Error fetching current network: " + e.message);
+      }
+    }
     const count = parseInt(keysToGenerate);
     if (isNaN(count) || count <= 0) {
       alert("Please enter a valid number greater than 0");
@@ -375,9 +388,9 @@ const AdminPage = ({ currentAccount }) => {
         { iv, mode: CryptoJS.mode.CTR, padding: CryptoJS.pad.NoPadding }
       );
       const encryptedPrivateKey = encrypted.ciphertext.toString(CryptoJS.enc.Hex);
-      // Build the dApp URL using the dynamic domain, network name, wallet address and encrypted pk
-      const dappUrl = `${currentDomain}/?network=${networkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
-      // Now build a deep link that will directly open Coinbase Wallet using its deep link format.
+      // Build the dApp URL using the current network name at CSV creation time.
+      const dappUrl = `${currentDomain}/?network=${currentNetworkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
+      // Build a deep link for Coinbase Wallet.
       const link = `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(dappUrl)}`;
       csvRows.push(`${wallet.address},${wallet.privateKey},${encryptedPrivateKey},${encryptionKey},${link}`);
       const qrOptions = {
