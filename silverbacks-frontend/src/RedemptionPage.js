@@ -1,12 +1,11 @@
-import React, { useEffect, useState, memo } from "react";
+import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
 import chains from "./chains.json";
 import NFTCard from "./NFTCard";
 import CryptoJS from "crypto-js";
-// Import and memoize QrReader to avoid defaultProps warnings
-import { QrReader } from "react-qr-reader";
-const MemoQrReader = memo(QrReader);
+// Import the BarcodeScannerComponent from react-qr-barcode-scanner
+import BarcodeScannerComponent from "react-qr-barcode-scanner";
 
 const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
 const nftABI = [
@@ -49,10 +48,18 @@ const RedemptionPage = ({ currentAccount }) => {
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
-  // New state: video devices and the selected camera id
+  // New state for QR scanner: to control the stream and camera selection
+  const [stopStream, setStopStream] = useState(false);
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
-  const [backCameraId, setBackCameraId] = useState(null);
+  const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+
+  // Logging helper with timestamp
+  const log = (msg) => {
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] ${msg}`);
+    setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
+  };
 
   const previewStyle = {
     height: 300,
@@ -60,13 +67,6 @@ const RedemptionPage = ({ currentAccount }) => {
     margin: "0 auto",
     border: "2px solid #fff",
     borderRadius: "8px"
-  };
-
-  // Logger with timestamp
-  const log = (msg) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] ${msg}`);
-    setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
   // Helper: Get an ethers provider.
@@ -98,23 +98,23 @@ const RedemptionPage = ({ currentAccount }) => {
     }
   };
 
-  // Enumerate available video devices when scanner is activated
+  // When scanning starts, enumerate available video devices
   useEffect(() => {
     if (scanning) {
-      async function getVideoDevices() {
+      async function enumerateDevices() {
         try {
-          // Request minimal access to ensure device labels are available
+          // Request video permission so that device labels are available
           await navigator.mediaDevices.getUserMedia({ video: true });
           const devices = await navigator.mediaDevices.enumerateDevices();
-          const vids = devices.filter((device) => device.kind === "videoinput");
-          setVideoDevices(vids);
-          if (vids.length > 0) {
-            // Prefer device with "back" or "rear" in its label if available
-            const backIndex = vids.findIndex((d) => /back|rear/i.test(d.label));
+          const videoInputs = devices.filter((d) => d.kind === "videoinput");
+          setVideoDevices(videoInputs);
+          if (videoInputs.length > 0) {
+            // Try to choose the back camera by looking for "back" or "rear" in the label
+            const backIndex = videoInputs.findIndex((d) => /back|rear/i.test(d.label));
             const indexToUse = backIndex >= 0 ? backIndex : 0;
             setSelectedCameraIndex(indexToUse);
-            setBackCameraId(vids[indexToUse].deviceId);
-            log(`Found ${vids.length} video devices; using device index ${indexToUse} (${vids[indexToUse].label})`);
+            setSelectedDeviceId(videoInputs[indexToUse].deviceId);
+            log(`Found ${videoInputs.length} video devices; using device index ${indexToUse} (${videoInputs[indexToUse].label})`);
           } else {
             log("No video devices found.");
           }
@@ -122,7 +122,9 @@ const RedemptionPage = ({ currentAccount }) => {
           log(`Error enumerating video devices: ${err.message}`);
         }
       }
-      getVideoDevices();
+      enumerateDevices();
+      // Reset stopStream in case it was previously set to true
+      setStopStream(false);
     }
   }, [scanning]);
 
@@ -298,23 +300,27 @@ const RedemptionPage = ({ currentAccount }) => {
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
     setPendingAction(action);
+    setStopStream(false);
     setScanning(true);
     log(`Initiated ${action} for tokenId=${tokenId}. Please scan ephemeral key's QR code.`);
   };
 
   // 7) Handle QR scan: once a valid result is obtained, immediately close the scanner and process the result.
-  const handleScan = async (data) => {
-    if (data && pendingTokenId !== null && pendingAction) {
-      // Close the scanner immediately to avoid duplicate processing.
+  const handleScan = async (err, result) => {
+    if (err) {
+      log(`QR Reader error: ${err.message}`);
+      return;
+    }
+    if (result && pendingTokenId !== null && pendingAction) {
+      log("QR Reader result received");
+      // Stop the scanner to avoid duplicate processing
+      setStopStream(true);
       setScanning(false);
       let scannedKey = "";
-      if (typeof data === "string") {
-        scannedKey = data;
-      } else if (typeof data === "object") {
-        log(`QR Code scanned raw data: ${JSON.stringify(data)}`);
-        scannedKey = data.text || JSON.stringify(data);
+      if (typeof result === "object" && result.text) {
+        scannedKey = result.text;
       } else {
-        scannedKey = String(data);
+        scannedKey = String(result);
       }
       log(`Extracted decryption key from QR code: ${scannedKey}`);
       log(`Original encrypted pk from URL: ${originalEncryptedPk}`);
@@ -341,17 +347,9 @@ const RedemptionPage = ({ currentAccount }) => {
           return;
         }
         await executeAction(pendingTokenId, pendingAction, ephemeralPk);
-      } catch (err) {
-        log(`Error during ephemeral PK decryption: ${err.message}`);
+      } catch (e) {
+        log(`Error during ephemeral PK decryption: ${e.message}`);
       }
-    }
-  };
-
-  const handleError = (err) => {
-    if (err && err.name && err.message) {
-      log(`QR Reader error in onResult: ${err.message}`);
-    } else {
-      log("QR Scanner encountered an unknown error.");
     }
   };
 
@@ -523,32 +521,19 @@ const RedemptionPage = ({ currentAccount }) => {
           <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
             Please scan ephemeral key's QR code
           </h4>
-          <MemoQrReader
-            key="qrreader"
+          <BarcodeScannerComponent
             delay={500}
-            style={previewStyle}
-            onResult={(result, error) => {
-              if (result) {
-                log("QR Reader result received");
-                // Immediately close the scanner and process the result.
-                setScanning(false);
-                handleScan(result.text);
-              } else if (error) {
-                log(`QR Reader error in onResult: ${error.message}`);
-              }
-            }}
-            constraints={{
-              video: backCameraId
-                ? { deviceId: { exact: backCameraId } }
-                : { facingMode: { exact: "environment" } }
-            }}
-            videoProps={{
-              playsInline: true,
-              autoPlay: true,
-              muted: true
-            }}
+            width={300}
+            height={300}
+            stopStream={stopStream}
+            videoConstraints={
+              selectedDeviceId
+                ? { deviceId: { exact: selectedDeviceId } }
+                : { facingMode: "environment" }
+            }
+            onUpdate={handleScan}
           />
-          {/* Button to cycle through available cameras */}
+          {/* Button to cycle through available cameras if more than one exists */}
           {videoDevices.length > 1 && (
             <button
               style={{
@@ -563,7 +548,7 @@ const RedemptionPage = ({ currentAccount }) => {
               onClick={() => {
                 const nextIndex = (selectedCameraIndex + 1) % videoDevices.length;
                 setSelectedCameraIndex(nextIndex);
-                setBackCameraId(videoDevices[nextIndex].deviceId);
+                setSelectedDeviceId(videoDevices[nextIndex].deviceId);
                 log(`Switching to camera: ${videoDevices[nextIndex].label || "unknown"}`);
               }}
             >
@@ -582,6 +567,7 @@ const RedemptionPage = ({ currentAccount }) => {
             }}
             onClick={() => {
               log("QR scanning cancelled by user");
+              setStopStream(true);
               setScanning(false);
             }}
           >
