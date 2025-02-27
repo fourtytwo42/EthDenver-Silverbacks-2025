@@ -1,12 +1,10 @@
-// silverbacks-frontend/src/AdminPage.js
-
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { create } from "ipfs-http-client";
 import chains from "./chains.json";
-import CryptoJS from "crypto-js";      // For AES encryption
-import QRCode from "qrcode";           // For QR code generation
-import JSZip from "jszip";             // For creating ZIP archives
+import CryptoJS from "crypto-js"; // For AES encryption
+import QRCode from "qrcode"; // For QR code generation
+import JSZip from "jszip"; // For creating ZIP archives
 
 // Minimal ABIs for interacting with our contracts
 const stableCoinABI = [
@@ -25,11 +23,15 @@ const nftABI = [
   "function safeTransferFrom(address from, address to, uint256 tokenId)"
 ];
 
+// Unified vault ABI used for both Silverbacks and King Louis
 const vaultABI = [
-  "function deposit(uint256 depositAmount, string metadataURI) external",
-  "function depositTo(address recipient, uint256 depositAmount, string metadataURI) external",
-  "function batchDeposit(address[] recipients, string[] metadataURIs) external",
-  "function redeem(uint256 tokenId) external"
+  "function deposit(uint256, string) external",
+  "function depositTo(address, uint256, string) external",
+  "function batchDeposit(address[] calldata, string[] calldata) external",
+  "function redeem(uint256) external",
+  "function redeemWithAuth(uint256, bytes) external",
+  "function redeemTo(uint256, bytes) external",
+  "function claimNFT(uint256, bytes) external"
 ];
 
 const AdminPage = ({ currentAccount }) => {
@@ -42,7 +44,7 @@ const AdminPage = ({ currentAccount }) => {
   const [nfts, setNfts] = useState([]);
   const [logMessages, setLogMessages] = useState([]);
   const [contractAddresses, setContractAddresses] = useState(null);
-  const [erc20Balance, setErc20Balance] = useState(null);
+  const [erc20Balance, setErc20Balance] = useState("");
   const [activeTab, setActiveTab] = useState("mintSelf");
   const [keysToGenerate, setKeysToGenerate] = useState("1");
   const [generatedCSV, setGeneratedCSV] = useState(null);
@@ -50,6 +52,20 @@ const AdminPage = ({ currentAccount }) => {
   const [testURL, setTestURL] = useState("");
   const [testDecryptionKey, setTestDecryptionKey] = useState("");
   const [testDecryptedPrivateKey, setTestDecryptedPrivateKey] = useState("");
+
+  // NFT type selection: "silverbacks" uses stablecoin deposits; "kinglouis" uses 3 tokens (WBTC, WETH, WLTC)
+  const [nftType, setNftType] = useState("silverbacks");
+
+  // Token balances for connected wallet
+  const [stableCoinBalance, setStableCoinBalance] = useState("");
+  const [wbtcBalance, setWbtcBalance] = useState("");
+  const [wethBalance, setWethBalance] = useState("");
+  const [wltcBalance, setWltcBalance] = useState("");
+
+  // Required amounts for King Louis deposits
+  const REQUIRED_WBTC = ethers.utils.parseUnits("0.05", 18);
+  const REQUIRED_WETH = ethers.utils.parseUnits("0.5", 18);
+  const REQUIRED_WLTC = ethers.utils.parseUnits("3", 18);
 
   const tabButtonStyle = {
     padding: "10px 20px",
@@ -71,7 +87,9 @@ const AdminPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // Load contract addresses based on the current MetaMask chain.
+  // -------------------------------------
+  // Load Contract Addresses from chains.json
+  // -------------------------------------
   const loadContractAddresses = async () => {
     if (window.ethereum) {
       try {
@@ -108,54 +126,97 @@ const AdminPage = ({ currentAccount }) => {
     }
   }, []);
 
-  // Load stablecoin balance and NFT data.
+  // -------------------------------------
+  // Load stablecoin balance and NFT data
+  // -------------------------------------
   const loadData = async () => {
     if (!currentAccount || !contractAddresses) return;
     const provider = new ethers.providers.Web3Provider(window.ethereum);
-    const stableCoinContract = new ethers.Contract(
-      contractAddresses.stableCoin,
-      stableCoinABI,
-      provider
-    );
-    const nftContract = new ethers.Contract(
-      contractAddresses.silverbacksNFT,
-      nftABI,
-      provider
-    );
     try {
+      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
       const bal = await stableCoinContract.balanceOf(currentAccount);
       log("StableCoin balance (raw) = " + bal.toString());
       setErc20Balance(ethers.utils.formatEther(bal));
-      const nftCount = await nftContract.balanceOf(currentAccount);
-      log("You own " + nftCount.toNumber() + " Silverbacks NFTs.");
-      const nftData = [];
-      for (let i = 0; i < nftCount.toNumber(); i++) {
-        const tokenId = await nftContract.tokenOfOwnerByIndex(currentAccount, i);
-        const faceValue = await nftContract.faceValue(tokenId);
-        const tokenURI = await nftContract.tokenURI(tokenId);
-        log(`Token ID ${tokenId} metadata URI: ${tokenURI}`);
-        let metadata = {};
-        try {
-          const response = await fetch(
-            "https://silverbacksipfs.online/ipfs/" + tokenURI.slice(7)
-          );
-          metadata = await response.json();
-        } catch (err) {
-          log("Error fetching metadata for token " + tokenId + ": " + err.message);
-        }
-        nftData.push({
-          tokenId: tokenId.toString(),
-          faceValue: faceValue.toString(),
-          image: metadata.image || null,
-          imageBack: metadata.properties?.imageBack || null,
-          name: metadata.name || "",
-          description: metadata.description || ""
-        });
-      }
-      setNfts(nftData);
     } catch (err) {
-      log("Error loading admin data: " + err.message);
+      log("Error loading stable coin balance: " + err.message);
     }
+
+    let nftData = [];
+    // Load Silverbacks NFTs
+    if (contractAddresses.silverbacksNFT) {
+      const silverbacksNFTContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
+      try {
+        const count = await silverbacksNFTContract.balanceOf(currentAccount);
+        log("You own " + count.toNumber() + " Silverbacks NFTs.");
+        for (let i = 0; i < count.toNumber(); i++) {
+          const tokenId = await silverbacksNFTContract.tokenOfOwnerByIndex(currentAccount, i);
+          const faceVal = await silverbacksNFTContract.faceValue(tokenId);
+          const tokenURI = await silverbacksNFTContract.tokenURI(tokenId);
+          log(`Silverbacks NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
+          let metadata = {};
+          try {
+            if (tokenURI.startsWith("ipfs://")) {
+              const cid = tokenURI.slice(7);
+              const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
+              metadata = await response.json();
+              log(`Fetched metadata for Silverbacks tokenId=${tokenId}`);
+            }
+          } catch (err) {
+            log("Error fetching metadata for Silverbacks token " + tokenId + ": " + err.message);
+          }
+          nftData.push({
+            tokenId: tokenId.toString(),
+            faceValue: faceVal.toString(),
+            tokenURI,
+            image: metadata.image || null,
+            imageBack: metadata.properties ? metadata.properties.imageBack : null,
+            name: metadata.name || "",
+            description: metadata.description || "",
+            type: "silverbacks"
+          });
+        }
+      } catch (err) {
+        log("Error loading Silverbacks NFTs: " + err.message);
+      }
+    }
+    // Load King Louis NFTs
+    if (contractAddresses.multiTokenNFT) {
+      const kinglouisNFTContract = new ethers.Contract(contractAddresses.multiTokenNFT, nftABI, provider);
+      try {
+        const count = await kinglouisNFTContract.balanceOf(currentAccount);
+        log("You own " + count.toNumber() + " King Louis NFTs.");
+        for (let i = 0; i < count.toNumber(); i++) {
+          const tokenId = await kinglouisNFTContract.tokenOfOwnerByIndex(currentAccount, i);
+          const faceVal = await kinglouisNFTContract.faceValue(tokenId);
+          const tokenURI = await kinglouisNFTContract.tokenURI(tokenId);
+          log(`King Louis NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
+          let metadata = {};
+          try {
+            if (tokenURI.startsWith("ipfs://")) {
+              const cid = tokenURI.slice(7);
+              const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
+              metadata = await response.json();
+              log(`Fetched metadata for King Louis tokenId=${tokenId}`);
+            }
+          } catch (err) {
+            log("Error fetching metadata for King Louis token " + tokenId + ": " + err.message);
+          }
+          nftData.push({
+            tokenId: tokenId.toString(),
+            faceValue: faceVal.toString(),
+            tokenURI,
+            image: metadata.image || null,
+            imageBack: metadata.properties ? metadata.properties.imageBack : null,
+            name: metadata.name || "",
+            description: metadata.description || "",
+            type: "kinglouis"
+          });
+        }
+      } catch (err) {
+        log("Error loading King Louis NFTs: " + err.message);
+      }
+    }
+    setNfts(nftData);
   };
 
   useEffect(() => {
@@ -164,7 +225,47 @@ const AdminPage = ({ currentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // Helper: Upload images and metadata JSON to IPFS.
+  // -------------------------------------
+  // Load ERC20 token balances for connected wallet.
+  // -------------------------------------
+  const loadTokenBalances = async () => {
+    if (!currentAccount || !contractAddresses) return;
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      if (contractAddresses.stableCoin) {
+        const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
+        const balance = await stableCoinContract.balanceOf(currentAccount);
+        setStableCoinBalance(ethers.utils.formatEther(balance));
+      }
+      if (contractAddresses.wbtc) {
+        const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, provider);
+        const balance = await wbtcContract.balanceOf(currentAccount);
+        setWbtcBalance(ethers.utils.formatEther(balance));
+      }
+      if (contractAddresses.weth) {
+        const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, provider);
+        const balance = await wethContract.balanceOf(currentAccount);
+        setWethBalance(ethers.utils.formatEther(balance));
+      }
+      if (contractAddresses.wltc) {
+        const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, provider);
+        const balance = await wltcContract.balanceOf(currentAccount);
+        setWltcBalance(ethers.utils.formatEther(balance));
+      }
+    } catch (error) {
+      log("Error loading token balances: " + error.message);
+    }
+  };
+
+  useEffect(() => {
+    if (currentAccount && contractAddresses) {
+      loadTokenBalances();
+    }
+  }, [currentAccount, contractAddresses]);
+
+  // -------------------------------------
+  // Upload images and metadata JSON to IPFS.
+  // -------------------------------------
   const uploadMetadataToIPFS = async (frontFile, backFile) => {
     try {
       if (!frontFile) {
@@ -181,8 +282,11 @@ const AdminPage = ({ currentAccount }) => {
         log("Back image uploaded with CID: " + backCID);
       }
       const metadata = {
-        name: "Silverback NFT",
-        description: "An NFT representing a $100 bill.",
+        name: nftType === "silverbacks" ? "Silverback NFT" : "King Louis NFT",
+        description:
+          nftType === "silverbacks"
+            ? "An NFT representing a $100 bill."
+            : "A King Louis NFT with exclusive features.",
         image: "ipfs://" + frontCID,
         properties: { imageBack: backCID ? "ipfs://" + backCID : "" }
       };
@@ -197,7 +301,17 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // Handle deposit & mint for "Mint Self" tab.
+  // Helper: Get the correct vault address based on nftType.
+  const getVaultAddress = () => {
+    if (!contractAddresses) return null;
+    return nftType === "silverbacks"
+      ? contractAddresses.vault
+      : contractAddresses.multiTokenVault;
+  };
+
+  // -------------------------------------
+  // Silverbacks Deposit Functions
+  // -------------------------------------
   const handleDeposit = async () => {
     if (!frontImageFile || !backImageFile) {
       alert("Please select both front and back images.");
@@ -213,22 +327,19 @@ const AdminPage = ({ currentAccount }) => {
       const depositWei = ethers.utils.parseEther(rawAmount);
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const stableCoinContract = new ethers.Contract(
-        contractAddresses.stableCoin,
-        stableCoinABI,
-        signer
-      );
-      const vaultContract = new ethers.Contract(
-        contractAddresses.vault,
-        vaultABI,
-        signer
-      );
-      let tx = await stableCoinContract.approve(contractAddresses.vault, depositWei);
+      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
+      const vaultAddress = getVaultAddress();
+      if (!vaultAddress) {
+        alert("Vault address not found for selected NFT type.");
+        return;
+      }
+      let tx = await stableCoinContract.approve(vaultAddress, depositWei);
       log("Approving vault to spend " + rawAmount + " tokens...");
       await tx.wait();
       log("Approval confirmed.");
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
       tx = await vaultContract.deposit(depositWei, metaURI);
-      log("Depositing stablecoins and minting NFT(s)...");
+      log("Depositing stablecoins and minting Silverback NFT(s)...");
       await tx.wait();
       log("Deposit transaction confirmed!");
       loadData();
@@ -237,7 +348,6 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // Handle depositTo for "Mint to Recipient" tab.
   const handleDepositTo = async () => {
     if (!depositRecipient || !ethers.utils.isAddress(depositRecipient)) {
       alert("Please enter a valid recipient address.");
@@ -252,22 +362,14 @@ const AdminPage = ({ currentAccount }) => {
       const depositWei = ethers.utils.parseEther("100");
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const stableCoinContract = new ethers.Contract(
-        contractAddresses.stableCoin,
-        stableCoinABI,
-        signer
-      );
-      let approveTx = await stableCoinContract.approve(contractAddresses.vault, depositWei);
+      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
+      let approveTx = await stableCoinContract.approve(getVaultAddress(), depositWei);
       log("Approving vault to spend 100 tokens...");
       await approveTx.wait();
       log("Approval confirmed.");
-      const vaultContract = new ethers.Contract(
-        contractAddresses.vault,
-        vaultABI,
-        signer
-      );
+      const vaultContract = new ethers.Contract(getVaultAddress(), vaultABI, signer);
       let tx = await vaultContract.depositTo(depositRecipient, depositWei, metaURI);
-      log("Depositing stablecoins and minting NFT to " + depositRecipient + "...");
+      log("Depositing stablecoins and minting Silverback NFT to " + depositRecipient + "...");
       await tx.wait();
       log("DepositTo transaction confirmed!");
       loadData();
@@ -276,7 +378,6 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // Handle CSV batch deposit for "Batch Mint" tab.
   const handleCSVDeposit = async () => {
     if (!csvFile) {
       alert("Please select a CSV file.");
@@ -317,22 +418,14 @@ const AdminPage = ({ currentAccount }) => {
       const totalDeposit = ethers.utils.parseEther((recipients.length * 100).toString());
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const stableCoinContract = new ethers.Contract(
-        contractAddresses.stableCoin,
-        stableCoinABI,
-        signer
-      );
-      let tx = await stableCoinContract.approve(contractAddresses.vault, totalDeposit);
+      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
+      let tx = await stableCoinContract.approve(getVaultAddress(), totalDeposit);
       log("Approving vault for batch deposit of " + (recipients.length * 100) + " tokens...");
       await tx.wait();
       log("Approval confirmed.");
-      const vaultContract = new ethers.Contract(
-        contractAddresses.vault,
-        vaultABI,
-        signer
-      );
+      const vaultContract = new ethers.Contract(getVaultAddress(), vaultABI, signer);
       tx = await vaultContract.batchDeposit(recipients, metadataURIs);
-      log("Batch deposit transaction submitted...");
+      log("Batch deposit transaction submitted for Silverback NFTs...");
       await tx.wait();
       log("Batch deposit transaction confirmed!");
       loadData();
@@ -341,23 +434,192 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // Handle burning (redeeming) an NFT.
-  const handleBurn = async (tokenId) => {
+  // -------------------------------------
+  // King Louis Deposit Functions
+  // -------------------------------------
+  const handleDepositKingLouis = async () => {
+    if (!frontImageFile || !backImageFile) {
+      alert("Please select both front and back images.");
+      return;
+    }
     try {
+      const metaURI = await uploadMetadataToIPFS(frontImageFile, backImageFile);
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
-      log("Burning NFT tokenId: " + tokenId + " to redeem stablecoins...");
-      const tx = await vaultContract.redeem(tokenId);
+      const vaultAddress = getVaultAddress();
+      if (!vaultAddress) {
+        alert("Vault address not found for selected NFT type.");
+        return;
+      }
+      // Approve each token (for King Louis, tokens like WBTC, WETH, WLTC are required)
+      const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
+      const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
+      const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
+      let tx = await wbtcContract.approve(vaultAddress, REQUIRED_WBTC);
+      log("Approving vault to spend 0.05 WBTC...");
       await tx.wait();
-      log("Redeem transaction confirmed!");
+      tx = await wethContract.approve(vaultAddress, REQUIRED_WETH);
+      log("Approving vault to spend 0.5 WETH...");
+      await tx.wait();
+      tx = await wltcContract.approve(vaultAddress, REQUIRED_WLTC);
+      log("Approving vault to spend 3 WLTC...");
+      await tx.wait();
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      // Pass 0 as the dummy deposit amount for King Louis
+      tx = await vaultContract.deposit(0, metaURI);
+      log("Depositing tokens and minting King Louis NFT...");
+      await tx.wait();
+      log("Deposit transaction confirmed!");
       loadData();
     } catch (err) {
-      log("Error burning NFT: " + err.message);
+      log("Error in King Louis deposit: " + err.message);
     }
   };
 
-  // --- New: Keypair & Link Generation with QR Codes ---
+  const handleDepositToKingLouis = async () => {
+    if (!depositRecipient || !ethers.utils.isAddress(depositRecipient)) {
+      alert("Please enter a valid recipient address.");
+      return;
+    }
+    if (!frontImageFile || !backImageFile) {
+      alert("Please select both front and back images.");
+      return;
+    }
+    try {
+      const metaURI = await uploadMetadataToIPFS(frontImageFile, backImageFile);
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const vaultAddress = getVaultAddress();
+      if (!vaultAddress) {
+        alert("Vault address not found for selected NFT type.");
+        return;
+      }
+      const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
+      const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
+      const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
+      let tx = await wbtcContract.approve(vaultAddress, REQUIRED_WBTC);
+      log("Approving vault to spend 0.05 WBTC...");
+      await tx.wait();
+      tx = await wethContract.approve(vaultAddress, REQUIRED_WETH);
+      log("Approving vault to spend 0.5 WETH...");
+      await tx.wait();
+      tx = await wltcContract.approve(vaultAddress, REQUIRED_WLTC);
+      log("Approving vault to spend 3 WLTC...");
+      await tx.wait();
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      // Pass 0 as the dummy deposit amount for King Louis
+      tx = await vaultContract.depositTo(depositRecipient, 0, metaURI);
+      log("Depositing tokens and minting King Louis NFT to " + depositRecipient + "...");
+      await tx.wait();
+      log("DepositTo transaction confirmed!");
+      loadData();
+    } catch (err) {
+      log("Error in King Louis depositTo: " + err.message);
+    }
+  };
+
+  const handleCSVDepositKingLouis = async () => {
+    if (!csvFile) {
+      alert("Please select a CSV file.");
+      return;
+    }
+    try {
+      const fileText = await csvFile.text();
+      const rows = fileText.split("\n").filter((row) => row.trim() !== "");
+      const recipients = [];
+      const metadataURIs = [];
+      const ipfsClient = create({ url: "https://silverbacksipfs.online/api/v0" });
+      for (let row of rows) {
+        const cols = row.split(",");
+        if (cols.length < 3) continue;
+        const recipient = cols[0].trim();
+        const frontURL = cols[1].trim();
+        const backURL = cols[2].trim();
+        if (!ethers.utils.isAddress(recipient)) {
+          log("Invalid address in CSV: " + recipient);
+          continue;
+        }
+        const metadata = {
+          name: "King Louis NFT",
+          description: "A King Louis NFT with exclusive features.",
+          image: frontURL,
+          properties: { imageBack: backURL }
+        };
+        const metadataAdded = await ipfsClient.add(JSON.stringify(metadata));
+        const metaURI = "ipfs://" + metadataAdded.path;
+        recipients.push(recipient);
+        metadataURIs.push(metaURI);
+        log(`Processed CSV row for ${recipient}. Metadata URI: ${metaURI}`);
+      }
+      if (recipients.length === 0) {
+        alert("No valid entries found in CSV.");
+        return;
+      }
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const vaultAddress = getVaultAddress();
+      if (!vaultAddress) {
+        alert("Vault address not found for selected NFT type.");
+        return;
+      }
+      // Calculate total token amounts required
+      const totalWbtc = REQUIRED_WBTC.mul(recipients.length);
+      const totalWeth = REQUIRED_WETH.mul(recipients.length);
+      const totalWltc = REQUIRED_WLTC.mul(recipients.length);
+      const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
+      const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
+      const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
+      let tx = await wbtcContract.approve(vaultAddress, totalWbtc);
+      log("Approving vault to spend total " + ethers.utils.formatUnits(totalWbtc, 18) + " WBTC...");
+      await tx.wait();
+      tx = await wethContract.approve(vaultAddress, totalWeth);
+      log("Approving vault to spend total " + ethers.utils.formatUnits(totalWeth, 18) + " WETH...");
+      await tx.wait();
+      tx = await wltcContract.approve(vaultAddress, totalWltc);
+      log("Approving vault to spend total " + ethers.utils.formatUnits(totalWltc, 18) + " WLTC...");
+      await tx.wait();
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      tx = await vaultContract.batchDeposit(recipients, metadataURIs);
+      log("Batch deposit transaction submitted for King Louis NFTs...");
+      await tx.wait();
+      log("Batch deposit transaction confirmed!");
+      loadData();
+    } catch (err) {
+      log("Error in CSV deposit: " + err.message);
+    }
+  };
+
+  // -------------------------------------
+  // Burn (Redeem) Function for NFTs
+  // -------------------------------------
+  const handleBurn = async (tokenId, type) => {
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      let vaultAddress;
+      if (type === "silverbacks") {
+        vaultAddress = contractAddresses.vault;
+      } else if (type === "kinglouis") {
+        vaultAddress = contractAddresses.multiTokenVault;
+      }
+      if (!vaultAddress) {
+        alert("Vault address not found for NFT type: " + type);
+        return;
+      }
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      log(`Redeeming NFT tokenId ${tokenId} from ${type} vault...`);
+      const tx = await vaultContract.redeem(tokenId);
+      await tx.wait();
+      log(`Redeem confirmed for tokenId ${tokenId}`);
+      loadData();
+    } catch (err) {
+      log("Error redeeming NFT: " + err.message);
+    }
+  };
+
+  // -------------------------------------
+  // Keypair & Link Generation with QR Codes (Old Way)
+  // -------------------------------------
   const handleGenerateKeys = async () => {
     let currentNetworkName = networkName;
     if (window.ethereum) {
@@ -390,9 +652,7 @@ const AdminPage = ({ currentAccount }) => {
         { iv, mode: CryptoJS.mode.CTR, padding: CryptoJS.pad.NoPadding }
       );
       const encryptedPrivateKey = encrypted.ciphertext.toString(CryptoJS.enc.Hex);
-      const dappUrl = `${currentDomain}/?network=${currentNetworkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
-      // Use normal URL without Coinbase deep link on admin CSV generation
-      const link = dappUrl;
+      const link = `${currentDomain}/?network=${currentNetworkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
       csvRows.push(`${wallet.address},${wallet.privateKey},${encryptedPrivateKey},${encryptionKey},${link}`);
       const qrOptions = {
         errorCorrectionLevel: 'H',
@@ -421,7 +681,9 @@ const AdminPage = ({ currentAccount }) => {
     return result;
   };
 
-  // --- New: Test Decryption Handler ---
+  // -------------------------------------
+  // Test Decryption Handler
+  // -------------------------------------
   const handleTestDecryption = () => {
     try {
       const urlObj = new URL(testURL);
@@ -453,9 +715,20 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
+  // -------------------------------------
+  // Render
+  // -------------------------------------
   return (
     <div className="container">
       <h1 className="center-align">Admin Dashboard</h1>
+      {/* Display connected wallet token balances */}
+      <div style={{ marginBottom: "20px", padding: "10px", border: "1px solid #ccc", borderRadius: "4px" }}>
+        <h5>Wallet Balances:</h5>
+        <p>StableCoin: {stableCoinBalance}</p>
+        <p>WBTC: {wbtcBalance}</p>
+        <p>WETH: {wethBalance}</p>
+        <p>WLTC: {wltcBalance}</p>
+      </div>
       <div style={{ marginBottom: "20px" }}>
         <button onClick={() => setActiveTab("mintSelf")} style={activeTab === "mintSelf" ? activeTabButtonStyle : tabButtonStyle}>
           Mint Self
@@ -469,9 +742,6 @@ const AdminPage = ({ currentAccount }) => {
         <button onClick={() => setActiveTab("nfts")} style={activeTab === "nfts" ? activeTabButtonStyle : tabButtonStyle}>
           Your NFTs
         </button>
-        <button onClick={() => setActiveTab("debug")} style={activeTab === "debug" ? activeTabButtonStyle : tabButtonStyle}>
-          Debug Log
-        </button>
         <button onClick={() => setActiveTab("generateKeys")} style={activeTab === "generateKeys" ? activeTabButtonStyle : tabButtonStyle}>
           Generate Keys
         </button>
@@ -484,8 +754,31 @@ const AdminPage = ({ currentAccount }) => {
           <div>
             <div className="card">
               <div className="card-content">
-                <span className="card-title">Mint Silverbacks (to Self)</span>
-                <p>Deposit must be a multiple of 100. You’ll receive 1 NFT per $100 deposited.</p>
+                {/* NFT Type dropdown */}
+                <div style={{ marginBottom: "10px" }}>
+                  <label style={{ marginRight: "10px", fontWeight: "bold" }}>NFT Type:</label>
+                  <select value={nftType} onChange={(e) => setNftType(e.target.value)}>
+                    <option value="silverbacks">Silverbacks</option>
+                    <option value="kinglouis">King Louis</option>
+                  </select>
+                </div>
+                {nftType === "kinglouis" ? (
+                  <>
+                    <span className="card-title">Mint King Louis (to Self)</span>
+                    <p>Your wallet will transfer 0.05 WBTC, 0.5 WETH, and 3 WLTC.</p>
+                  </>
+                ) : (
+                  <>
+                    <span className="card-title">Mint Silverbacks (to Self)</span>
+                    <p>Deposit must be a multiple of 100. You’ll receive 1 NFT per $100 deposited.</p>
+                    <div className="row">
+                      <div className="input-field col s12 m4">
+                        <input type="number" step="100" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
+                        <label className="active">Deposit Amount</label>
+                      </div>
+                    </div>
+                  </>
+                )}
                 <div className="row">
                   <div className="col s12 m6">
                     <div className="file-field input-field">
@@ -521,16 +814,21 @@ const AdminPage = ({ currentAccount }) => {
                   </div>
                 </div>
                 <div className="row">
-                  <div className="input-field col s12 m4">
-                    <input type="number" step="100" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
-                    <label className="active">Deposit Amount</label>
-                  </div>
-                  <div className="col s12 m8">
-                    <button onClick={handleDeposit} className="btn waves-effect waves-light">
-                      Deposit &amp; Mint
-                      <i className="material-icons right">send</i>
-                    </button>
-                  </div>
+                  {nftType === "kinglouis" ? (
+                    <div className="col s12">
+                      <button onClick={handleDepositKingLouis} className="btn waves-effect waves-light">
+                        Deposit Tokens &amp; Mint King Louis NFT
+                        <i className="material-icons right">send</i>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="col s12 m8">
+                      <button onClick={handleDeposit} className="btn waves-effect waves-light">
+                        Deposit &amp; Mint Silverback NFT
+                        <i className="material-icons right">send</i>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -540,8 +838,25 @@ const AdminPage = ({ currentAccount }) => {
           <div>
             <div className="card">
               <div className="card-content">
-                <span className="card-title">Mint Silverback to a Specific Address</span>
-                <p>Deposit exactly 100 stablecoins to mint a Silverback NFT to a chosen recipient.</p>
+                {/* NFT Type dropdown */}
+                <div style={{ marginBottom: "10px" }}>
+                  <label style={{ marginRight: "10px", fontWeight: "bold" }}>NFT Type:</label>
+                  <select value={nftType} onChange={(e) => setNftType(e.target.value)}>
+                    <option value="silverbacks">Silverbacks</option>
+                    <option value="kinglouis">King Louis</option>
+                  </select>
+                </div>
+                {nftType === "kinglouis" ? (
+                  <>
+                    <span className="card-title">Mint King Louis to a Specific Address</span>
+                    <p>Your wallet will transfer 0.05 WBTC, 0.5 WETH, and 3 WLTC.</p>
+                  </>
+                ) : (
+                  <>
+                    <span className="card-title">Mint Silverback to a Specific Address</span>
+                    <p>Deposit exactly 100 stablecoins to mint a Silverback NFT to a chosen recipient.</p>
+                  </>
+                )}
                 <div className="row">
                   <div className="input-field col s12">
                     <input type="text" placeholder="Recipient address" value={depositRecipient} onChange={(e) => setDepositRecipient(e.target.value)} />
@@ -580,7 +895,7 @@ const AdminPage = ({ currentAccount }) => {
                     </div>
                   </div>
                 </div>
-                <button onClick={handleDepositTo} className="btn waves-effect waves-light">
+                <button onClick={nftType === "kinglouis" ? handleDepositToKingLouis : handleDepositTo} className="btn waves-effect waves-light">
                   Deposit &amp; Mint to Recipient
                   <i className="material-icons right">send</i>
                 </button>
@@ -592,11 +907,31 @@ const AdminPage = ({ currentAccount }) => {
           <div>
             <div className="card">
               <div className="card-content">
-                <span className="card-title">Batch Mint from CSV</span>
-                <p>
-                  Upload a CSV file with 3 columns: Recipient address, Front image URL, Back image URL.
-                  Each row deposits $100 and mints an NFT.
-                </p>
+                {/* NFT Type dropdown */}
+                <div style={{ marginBottom: "10px" }}>
+                  <label style={{ marginRight: "10px", fontWeight: "bold" }}>NFT Type:</label>
+                  <select value={nftType} onChange={(e) => setNftType(e.target.value)}>
+                    <option value="silverbacks">Silverbacks</option>
+                    <option value="kinglouis">King Louis</option>
+                  </select>
+                </div>
+                {nftType === "kinglouis" ? (
+                  <>
+                    <span className="card-title">Batch Mint King Louis from CSV</span>
+                    <p>
+                      Upload a CSV file with 3 columns: Recipient address, Front image URL, Back image URL.
+                      Each row will trigger a deposit of 0.05 WBTC, 0.5 WETH, and 3 WLTC.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <span className="card-title">Batch Mint Silverbacks from CSV</span>
+                    <p>
+                      Upload a CSV file with 3 columns: Recipient address, Front image URL, Back image URL.
+                      Each row deposits $100 and mints a Silverback NFT.
+                    </p>
+                  </>
+                )}
                 <div className="file-field input-field">
                   <div className="btn">
                     <span>CSV File</span>
@@ -611,10 +946,14 @@ const AdminPage = ({ currentAccount }) => {
                     <input className="file-path validate" type="text" placeholder="Upload CSV" />
                   </div>
                 </div>
-                <button onClick={handleCSVDeposit} className="btn waves-effect waves-light">
-                  Process CSV Batch Deposit
-                  <i className="material-icons right">send</i>
-                </button>
+                <div className="row">
+                  <div className="col s12">
+                    <button onClick={nftType === "kinglouis" ? handleCSVDepositKingLouis : handleCSVDeposit} className="btn waves-effect waves-light">
+                      Process CSV Batch Deposit
+                      <i className="material-icons right">send</i>
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -623,13 +962,13 @@ const AdminPage = ({ currentAccount }) => {
           <div>
             <div className="card">
               <div className="card-content">
-                <span className="card-title">Your Silverbacks NFTs</span>
+                <span className="card-title">Your NFTs</span>
                 {nfts.length === 0 ? (
-                  <p>No Silverbacks NFTs found.</p>
+                  <p>No NFTs found.</p>
                 ) : (
                   <div className="row">
                     {nfts.map((n) => (
-                      <div key={n.tokenId} className="col s12 m6 l4">
+                      <div key={n.tokenId + "-" + n.type} className="col s12 m6 l4">
                         <div className="card">
                           <div className="card-image">
                             {n.image ? (
@@ -637,13 +976,43 @@ const AdminPage = ({ currentAccount }) => {
                             ) : (
                               <p>No image available.</p>
                             )}
+                            <button
+                              style={{
+                                position: "absolute",
+                                top: "10px",
+                                right: "10px",
+                                zIndex: 100,
+                                pointerEvents: "auto",
+                                backgroundColor: "rgba(0,0,0,0.6)",
+                                color: "#fff",
+                                border: "none",
+                                padding: "5px 10px",
+                                cursor: "pointer"
+                              }}
+                              onClick={() => {}}
+                            >
+                              Toggle
+                            </button>
+                            <div
+                              style={{
+                                position: "absolute",
+                                bottom: "0",
+                                left: "0",
+                                backgroundColor: "rgba(0,0,0,0.5)",
+                                color: "#fff",
+                                padding: "5px",
+                                fontSize: "14px"
+                              }}
+                            >
+                              Token ID: {n.tokenId}
+                            </div>
                           </div>
                           <div className="card-content">
-                            <p><strong>Token ID:</strong> {n.tokenId}</p>
+                            <p><strong>Type:</strong> {n.type}</p>
                             <p><strong>Face Value:</strong> {n.faceValue} USD</p>
                           </div>
                           <div className="card-action" style={{ display: "flex", justifyContent: "center", gap: "0.5rem" }}>
-                            <button onClick={() => handleBurn(n.tokenId)} className="btn red lighten-1">
+                            <button onClick={() => handleBurn(n.tokenId, n.type)} className="btn red lighten-1">
                               Burn &amp; Redeem
                             </button>
                           </div>
@@ -653,18 +1022,6 @@ const AdminPage = ({ currentAccount }) => {
                   </div>
                 )}
               </div>
-            </div>
-          </div>
-        )}
-        {activeTab === "debug" && (
-          <div>
-            <div className="card-panel grey darken-3" style={{ color: "white" }}>
-              <h5>Debug Log</h5>
-              {logMessages.map((msg, idx) => (
-                <p key={idx} style={{ fontFamily: "monospace", margin: "0.2rem 0" }}>
-                  {msg}
-                </p>
-              ))}
             </div>
           </div>
         )}
@@ -742,7 +1099,8 @@ const AdminPage = ({ currentAccount }) => {
           </div>
         )}
       </div>
-      <div className="card-panel grey darken-3" style={{ color: "white" }}>
+      {/* Debug Log Panel visible across all tabs */}
+      <div className="card-panel grey darken-3" style={{ color: "white", marginTop: "20px" }}>
         <h5>Debug Log</h5>
         {logMessages.map((msg, idx) => (
           <p key={idx} style={{ fontFamily: "monospace", margin: "0.2rem 0" }}>

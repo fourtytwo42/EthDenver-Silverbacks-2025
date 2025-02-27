@@ -1,5 +1,3 @@
-// silverbacks-frontend/src/RedemptionPage.js
-
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
@@ -107,7 +105,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   // State for stablecoin balance
   const [erc20Balance, setErc20Balance] = useState(null);
 
-  // Header area: now displays the network and the connected wallet's stablecoin balance.
+  // Header area: displays network and stablecoin balance.
   const renderHeaderArea = () => (
     <div
       style={{
@@ -148,10 +146,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   const [contractAddresses, setContractAddresses] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
-  const [pendingTokenId, setPendingTokenId] = useState(null);
+  const [pendingNFT, setPendingNFT] = useState(null);
   const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
   const [error, setError] = useState("");
-  const [missingNetworkInfo, setMissingNetworkInfo] = useState(null);
   const [stopStream, setStopStream] = useState(false);
   const [videoDevices, setVideoDevices] = useState([]);
   const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
@@ -165,9 +162,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
-  // ------------------------------------------------------------------
   // Auto-connect: If no currentAccount is set, try to load it from MetaMask.
-  // ------------------------------------------------------------------
   useEffect(() => {
     if (!currentAccount && window.ethereum) {
       window.ethereum
@@ -186,9 +181,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [currentAccount, setCurrentAccount]);
 
-  // ------------------------------------------------------------------
   // getProvider: Returns a provider and attempts to switch/add network if needed.
-  // ------------------------------------------------------------------
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
@@ -279,9 +272,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // ------------------------------------------------------------------
   // loadContracts: Loads contract addresses based on the current chain.
-  // ------------------------------------------------------------------
   const loadContracts = async () => {
     try {
       const provider = await getProvider();
@@ -303,9 +294,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     loadContracts();
   }, [urlNetworkParam]);
 
-  // ------------------------------------------------------------------
   // Load ERC20 stablecoin balance for connected wallet.
-  // ------------------------------------------------------------------
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
     try {
@@ -330,9 +319,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // ------------------------------------------------------------------
   // Set NFT owner address from URL parameters.
-  // ------------------------------------------------------------------
   useEffect(() => {
     if (originalEncryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
       setOwnerAddress(urlAddress);
@@ -342,49 +329,82 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [originalEncryptedPk, urlAddress]);
 
-  // ------------------------------------------------------------------
-  // Load NFTs owned by the ephemeral address (from URL).
-  // ------------------------------------------------------------------
+  // Load ephemeral NFTs (for bill verification) from both silverbacks and King Louis contracts.
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
     try {
       const provider = await getProvider();
-      const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
-      const count = await nftContract.balanceOf(ownerAddress);
-      log(`Ephemeral key owns ${count.toString()} NFT(s).`);
-      const nftData = [];
-      for (let i = 0; i < count.toNumber(); i++) {
-        const tokenId = await nftContract.tokenOfOwnerByIndex(ownerAddress, i);
-        const faceVal = await nftContract.faceValue(tokenId);
-        const tokenURI = await nftContract.tokenURI(tokenId);
-        log(`Redeem NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
-        let metadata = {};
-        try {
-          if (tokenURI.startsWith("ipfs://")) {
-            const cid = tokenURI.slice(7);
-            const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
-            metadata = await response.json();
-            log(`Fetched metadata for tokenId=${tokenId}`);
+      let nftData = [];
+      if (contractAddresses.silverbacksNFT) {
+        const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
+        const count = await nftContract.balanceOf(ownerAddress);
+        log(`Ephemeral wallet owns ${count.toString()} Silverbacks NFT(s).`);
+        for (let i = 0; i < count.toNumber(); i++) {
+          const tokenId = await nftContract.tokenOfOwnerByIndex(ownerAddress, i);
+          const faceVal = await nftContract.faceValue(tokenId);
+          const tokenURI = await nftContract.tokenURI(tokenId);
+          log(`Silverbacks NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
+          let metadata = {};
+          try {
+            if (tokenURI.startsWith("ipfs://")) {
+              const cid = tokenURI.slice(7);
+              const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
+              metadata = await response.json();
+              log(`Fetched metadata for tokenId=${tokenId}`);
+            }
+          } catch (err) {
+            log(`Error fetching metadata for token ${tokenId}: ${err.message}`);
           }
-        } catch (err) {
-          log(`Error fetching metadata for token ${tokenId}: ${err.message}`);
+          nftData.push({
+            tokenId: tokenId.toString(),
+            faceValue: faceVal.toString(),
+            tokenURI,
+            image: metadata.image || null,
+            imageBack: metadata.properties ? metadata.properties.imageBack : null,
+            name: metadata.name || "",
+            description: metadata.description || "",
+            type: "silverbacks"
+          });
         }
-        nftData.push({
-          tokenId: tokenId.toString(),
-          faceValue: faceVal.toString(),
-          tokenURI,
-          image: metadata.image || null,
-          imageBack: metadata.properties ? metadata.properties.imageBack : null,
-          name: metadata.name || "",
-          description: metadata.description || ""
-        });
+      }
+      if (contractAddresses.multiTokenNFT) {
+        const nftContract = new ethers.Contract(contractAddresses.multiTokenNFT, nftABI, provider);
+        const count = await nftContract.balanceOf(ownerAddress);
+        log(`Ephemeral wallet owns ${count.toString()} King Louis NFT(s).`);
+        for (let i = 0; i < count.toNumber(); i++) {
+          const tokenId = await nftContract.tokenOfOwnerByIndex(ownerAddress, i);
+          const faceVal = await nftContract.faceValue(tokenId);
+          const tokenURI = await nftContract.tokenURI(tokenId);
+          log(`King Louis NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
+          let metadata = {};
+          try {
+            if (tokenURI.startsWith("ipfs://")) {
+              const cid = tokenURI.slice(7);
+              const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
+              metadata = await response.json();
+              log(`Fetched metadata for tokenId=${tokenId}`);
+            }
+          } catch (err) {
+            log(`Error fetching metadata for token ${tokenId}: ${err.message}`);
+          }
+          nftData.push({
+            tokenId: tokenId.toString(),
+            faceValue: faceVal.toString(),
+            tokenURI,
+            image: metadata.image || null,
+            imageBack: metadata.properties ? metadata.properties.imageBack : null,
+            name: metadata.name || "",
+            description: metadata.description || "",
+            type: "kinglouis"
+          });
+        }
       }
       setRedeemNFTs(nftData);
       if (nftData.length === 0) {
         log(`No redeemable NFTs found for ephemeral address ${ownerAddress}`);
       }
     } catch (err) {
-      log(`Error loading ephemeral key NFTs: ${err.message}`);
+      log(`Error loading ephemeral NFTs: ${err.message}`);
     }
   };
 
@@ -394,42 +414,75 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [ownerAddress, contractAddresses]);
 
-  // ------------------------------------------------------------------
-  // Load NFTs owned by the connected wallet.
-  // ------------------------------------------------------------------
+  // Load connected wallet NFTs from both silverbacks and King Louis contracts.
   const loadMyNFTs = async () => {
     if (!currentAccount || !contractAddresses) return;
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
-      const count = await nftContract.balanceOf(currentAccount);
-      log(`Connected wallet owns ${count.toString()} NFT(s).`);
-      const nftData = [];
-      for (let i = 0; i < count.toNumber(); i++) {
-        const tokenId = await nftContract.tokenOfOwnerByIndex(currentAccount, i);
-        const faceVal = await nftContract.faceValue(tokenId);
-        const tokenURI = await nftContract.tokenURI(tokenId);
-        log(`MyWallet NFT => tokenId=${tokenId}, faceValue=${faceVal}, URI=${tokenURI}`);
-        let metadata = {};
-        try {
-          if (tokenURI.startsWith("ipfs://")) {
-            const cid = tokenURI.slice(7);
-            const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
-            metadata = await response.json();
-            log(`Fetched metadata for tokenId=${tokenId}`);
+      let nftData = [];
+      if (contractAddresses.silverbacksNFT) {
+        const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
+        const count = await nftContract.balanceOf(currentAccount);
+        log(`Connected wallet owns ${count.toString()} Silverbacks NFT(s).`);
+        for (let i = 0; i < count.toNumber(); i++) {
+          const tokenId = await nftContract.tokenOfOwnerByIndex(currentAccount, i);
+          const faceVal = await nftContract.faceValue(tokenId);
+          const tokenURI = await nftContract.tokenURI(tokenId);
+          log(`Silverbacks NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
+          let metadata = {};
+          try {
+            if (tokenURI.startsWith("ipfs://")) {
+              const cid = tokenURI.slice(7);
+              const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
+              metadata = await response.json();
+              log(`Fetched metadata for tokenId=${tokenId}`);
+            }
+          } catch (err) {
+            log(`Error fetching metadata for token ${tokenId}: ${err.message}`);
           }
-        } catch (err) {
-          log(`Error fetching metadata for token ${tokenId}: ${err.message}`);
+          nftData.push({
+            tokenId: tokenId.toString(),
+            faceValue: faceVal.toString(),
+            tokenURI,
+            image: metadata.image || null,
+            imageBack: metadata.properties ? metadata.properties.imageBack : null,
+            name: metadata.name || "",
+            description: metadata.description || "",
+            type: "silverbacks"
+          });
         }
-        nftData.push({
-          tokenId: tokenId.toString(),
-          faceValue: faceVal.toString(),
-          tokenURI,
-          image: metadata.image || null,
-          imageBack: metadata.properties ? metadata.properties.imageBack : null,
-          name: metadata.name || "",
-          description: metadata.description || ""
-        });
+      }
+      if (contractAddresses.multiTokenNFT) {
+        const nftContract = new ethers.Contract(contractAddresses.multiTokenNFT, nftABI, provider);
+        const count = await nftContract.balanceOf(currentAccount);
+        log(`Connected wallet owns ${count.toString()} King Louis NFT(s).`);
+        for (let i = 0; i < count.toNumber(); i++) {
+          const tokenId = await nftContract.tokenOfOwnerByIndex(currentAccount, i);
+          const faceVal = await nftContract.faceValue(tokenId);
+          const tokenURI = await nftContract.tokenURI(tokenId);
+          log(`King Louis NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
+          let metadata = {};
+          try {
+            if (tokenURI.startsWith("ipfs://")) {
+              const cid = tokenURI.slice(7);
+              const response = await fetch("https://silverbacksipfs.online/ipfs/" + cid);
+              metadata = await response.json();
+              log(`Fetched metadata for tokenId=${tokenId}`);
+            }
+          } catch (err) {
+            log(`Error fetching metadata for token ${tokenId}: ${err.message}`);
+          }
+          nftData.push({
+            tokenId: tokenId.toString(),
+            faceValue: faceVal.toString(),
+            tokenURI,
+            image: metadata.image || null,
+            imageBack: metadata.properties ? metadata.properties.imageBack : null,
+            name: metadata.name || "",
+            description: metadata.description || "",
+            type: "kinglouis"
+          });
+        }
       }
       setMyNFTs(nftData);
       if (nftData.length === 0) {
@@ -446,9 +499,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // ------------------------------------------------------------------
   // Enumerate video devices when scanning.
-  // ------------------------------------------------------------------
   useEffect(() => {
     if (scanning) {
       async function enumerateDevices() {
@@ -475,9 +526,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [scanning]);
 
-  // ------------------------------------------------------------------
   // Auto-connect for in-app wallets on mobile.
-  // ------------------------------------------------------------------
   const connectWallet = async () => {
     if (!window.ethereum) {
       alert("Web3 wallet is not installed!");
@@ -506,33 +555,26 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [isMobile, currentAccount]);
 
-  // ------------------------------------------------------------------
-  // Initiate action via QR scanner.
-  // ------------------------------------------------------------------
-  const initiateAction = (tokenId, action) => {
-    setPendingTokenId(tokenId);
+  // Initiate action via QR scanner. Now we store the entire NFT object.
+  const initiateAction = (nft, action) => {
+    setPendingNFT(nft);
     setPendingAction(action);
     setStopStream(false);
     setScanning(true);
-    log(
-      `Initiated ${action} for tokenId=${tokenId}. Please scan the ephemeral key’s QR code.`
-    );
+    log(`Initiated ${action} for tokenId=${nft.tokenId} (type: ${nft.type}). Please scan the ephemeral key’s QR code.`);
   };
 
-  // ------------------------------------------------------------------
   // Handle QR scan result.
-  // ------------------------------------------------------------------
   const handleScan = async (err, result) => {
     if (err) {
       log(`QR Reader error: ${err.message}`);
       return;
     }
-    if (result && pendingTokenId !== null && pendingAction) {
+    if (result && pendingNFT && pendingAction) {
       log("QR scan result received.");
       setStopStream(true);
       setScanning(false);
-      let scannedKey =
-        typeof result === "object" && result.text ? result.text : String(result);
+      let scannedKey = typeof result === "object" && result.text ? result.text : String(result);
       log(`Extracted decryption key from QR code: ${scannedKey}`);
       try {
         const iv = CryptoJS.enc.Hex.parse("00000000000000000000000000000000");
@@ -552,76 +594,70 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         const ephemeralAddress = ephemeralWallet.address;
         log(`Ephemeral wallet address: ${ephemeralAddress}`);
         if (ephemeralAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
-          log(
-            `ERROR: ephemeral address ${ephemeralAddress} does not match URL address ${ownerAddress}.`
-          );
+          log(`ERROR: ephemeral address ${ephemeralAddress} does not match URL address ${ownerAddress}.`);
           return;
         }
-        await executeAction(pendingTokenId, pendingAction, ephemeralPk);
+        await executeAction(pendingNFT, pendingAction, ephemeralPk);
       } catch (e) {
         log(`Error during decryption: ${e.message}`);
       }
     }
   };
 
-  // ------------------------------------------------------------------
   // Execute action (redeem or claim) for ephemeral NFTs.
-  // ------------------------------------------------------------------
-  const executeAction = async (tokenId, action, ephemeralPrivateKey) => {
+  const executeAction = async (nft, action, ephemeralPrivateKey) => {
     try {
       const ephemeralWallet = new ethers.Wallet(ephemeralPrivateKey);
       let msg, signature, tx;
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
+      const vaultAddress = nft.type === "silverbacks" ? contractAddresses.vault : contractAddresses.multiTokenVault;
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
       if (action === "redeem") {
-        msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Redeem:", tokenId]);
+        msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Redeem:", nft.tokenId]);
         const messageHashBytes = ethers.utils.arrayify(msg);
         signature = await ephemeralWallet.signMessage(messageHashBytes);
         log(`Ephemeral signature (redeem): ${signature}`);
-        tx = await vaultContract.redeemTo(tokenId, signature);
-        log(`redeemTo transaction sent for tokenId=${tokenId}`);
+        tx = await vaultContract.redeemTo(nft.tokenId, signature);
+        log(`redeemTo transaction sent for tokenId=${nft.tokenId}`);
         await tx.wait();
-        log(`redeemTo confirmed for tokenId=${tokenId}`);
+        log(`redeemTo confirmed for tokenId=${nft.tokenId}`);
         loadRedeemNFTs();
       } else if (action === "claim") {
-        msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Claim:", tokenId]);
+        msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Claim:", nft.tokenId]);
         const messageHashBytes = ethers.utils.arrayify(msg);
         signature = await ephemeralWallet.signMessage(messageHashBytes);
         log(`Ephemeral signature (claim): ${signature}`);
-        tx = await vaultContract.claimNFT(tokenId, signature);
-        log(`claimNFT transaction sent for tokenId=${tokenId}`);
+        tx = await vaultContract.claimNFT(nft.tokenId, signature);
+        log(`claimNFT transaction sent for tokenId=${nft.tokenId}`);
         await tx.wait();
-        log(`claimNFT confirmed for tokenId=${tokenId}`);
+        log(`claimNFT confirmed for tokenId=${nft.tokenId}`);
         loadRedeemNFTs();
       }
     } catch (err) {
-      log(`Error executing ${action} for tokenId ${tokenId}: ${err.message}`);
+      log(`Error executing ${action} for tokenId ${nft.tokenId}: ${err.message}`);
     }
   };
 
-  // ------------------------------------------------------------------
   // Handle redemption of connected wallet's NFT.
-  // ------------------------------------------------------------------
-  const handleRedeemConnected = async (tokenId) => {
+  const handleRedeemConnected = async (nft) => {
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
-      log(`Redeeming NFT tokenId ${tokenId}...`);
-      const tx = await vaultContract.redeem(tokenId, { gasLimit: 10000000 });
+      const vaultAddress = nft.type === "silverbacks" ? contractAddresses.vault : contractAddresses.multiTokenVault;
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      log(`Redeeming NFT tokenId ${nft.tokenId}...`);
+      const tx = await vaultContract.redeem(nft.tokenId, { gasLimit: 10000000 });
       await tx.wait();
-      log(`Redeem confirmed for tokenId ${tokenId}`);
+      log(`Redeem confirmed for tokenId ${nft.tokenId}`);
       loadMyNFTs();
     } catch (err) {
       log("Error redeeming NFT: " + err.message);
     }
   };
 
-  // ------------------------------------------------------------------
   // Handle sending NFT from connected wallet.
-  // ------------------------------------------------------------------
-  const handleSendNFT = async (tokenId) => {
+  const handleSendNFT = async (nft) => {
     const recipient = prompt("Enter the recipient address:");
     if (!recipient || !ethers.utils.isAddress(recipient)) {
       alert("Invalid address!");
@@ -630,20 +666,19 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
-      const nftContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, signer);
-      log(`Sending NFT tokenId ${tokenId} to ${recipient}...`);
-      const tx = await nftContract["safeTransferFrom(address,address,uint256)"](currentAccount, recipient, tokenId);
+      const nftContractAddress = nft.type === "silverbacks" ? contractAddresses.silverbacksNFT : contractAddresses.multiTokenNFT;
+      const nftContract = new ethers.Contract(nftContractAddress, nftABI, signer);
+      log(`Sending NFT tokenId ${nft.tokenId} to ${recipient}...`);
+      const tx = await nftContract["safeTransferFrom(address,address,uint256)"](currentAccount, recipient, nft.tokenId);
       await tx.wait();
-      log(`NFT tokenId ${tokenId} sent to ${recipient}`);
+      log(`NFT tokenId ${nft.tokenId} sent to ${recipient}`);
       loadMyNFTs();
     } catch (err) {
       log("Error sending NFT: " + err.message);
     }
   };
 
-  // ------------------------------------------------------------------
   // Render the ephemeral section based on whether an NFT is present.
-  // ------------------------------------------------------------------
   const renderEphemeralSection = () => {
     if (!ownerAddress) return null;
     if (redeemNfts.length > 0) {
@@ -655,14 +690,14 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
             <br />
             Claim: Transfers the NFT from the ephemeral wallet to your connected wallet.
           </p>
-          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginTop: "1rem" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", marginTop: "1rem" }}>
             {redeemNfts.map((n) => (
               <NFTCard
-                key={n.tokenId}
+                key={n.tokenId + "-" + n.type}
                 nft={n}
                 pk={ephemeralDisplayPk}
-                handleRedeemTo={() => initiateAction(n.tokenId, "redeem")}
-                handleClaimNFT={() => initiateAction(n.tokenId, "claim")}
+                handleRedeemTo={() => initiateAction(n, "redeem")}
+                handleClaimNFT={() => initiateAction(n, "claim")}
                 handleRedeem={() => {}}
                 handleSendNFT={() => {}}
               />
@@ -679,9 +714,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // ------------------------------------------------------------------
   // Render missing network prompt if needed.
-  // ------------------------------------------------------------------
   const renderMissingNetworkPrompt = () => (
     <div
       style={{
@@ -726,18 +759,14 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     </div>
   );
 
-  // ------------------------------------------------------------------
   // Render desktop wallet install prompt if no web3 wallet is detected.
-  // ------------------------------------------------------------------
   const renderDesktopWalletInstallPrompt = () => (
     <div style={walletInstallPromptStyle}>
       <p>No web3 wallet detected. Please install MetaMask or Coinbase Wallet extension.</p>
     </div>
   );
 
-  // ------------------------------------------------------------------
   // Main render.
-  // ------------------------------------------------------------------
   return (
     <div
       style={{
@@ -765,13 +794,13 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
           <div style={{ marginBottom: "1rem", textAlign: "center" }}>
             <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>Your Wallet NFT</h2>
             {myNfts.length > 0 ? (
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginTop: "1rem" }}>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", marginTop: "1rem" }}>
                 {myNfts.map((n) => (
                   <NFTCard
-                    key={n.tokenId}
+                    key={n.tokenId + "-" + n.type}
                     nft={n}
-                    handleRedeem={() => handleRedeemConnected(n.tokenId)}
-                    handleSendNFT={() => handleSendNFT(n.tokenId)}
+                    handleRedeem={() => handleRedeemConnected(n)}
+                    handleSendNFT={() => handleSendNFT(n)}
                     handleClaimNFT={() => {}}
                     handleRedeemTo={() => {}}
                   />
@@ -798,18 +827,14 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
               textAlign: "center"
             }}
           >
-            <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
-              Scratch off and scan QR code
-            </h4>
+            <h4 style={{ color: "#fff", marginBottom: "1rem" }}>Scratch off and scan QR code</h4>
             <BarcodeScannerComponent
               delay={100}
               width={300}
               height={300}
               stopStream={stopStream}
               videoConstraints={
-                selectedDeviceId
-                  ? { deviceId: { exact: selectedDeviceId } }
-                  : { facingMode: "environment" }
+                selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: "environment" }
               }
               onUpdate={handleScan}
             />

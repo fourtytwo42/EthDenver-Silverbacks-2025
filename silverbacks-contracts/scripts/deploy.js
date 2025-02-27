@@ -1,6 +1,4 @@
-// silverbacks-contracts/scripts/deploy.js
-
-const { ethers } = require("hardhat");
+require("@nomiclabs/hardhat-ethers");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
@@ -24,7 +22,6 @@ async function deployContract(contractFactory, contractName, ...args) {
   } catch (err) {
     console.error("Error estimating gas: ", err.message);
   }
-
   try {
     const instance = await contractFactory.deploy(...args);
     await instance.deployed();
@@ -45,79 +42,69 @@ async function deployContract(contractFactory, contractName, ...args) {
 }
 
 async function main() {
-  // Log the deployer address before starting deployments.
+  // Log deployer info
   const [deployer] = await ethers.getSigners();
   console.log("Starting deployment with deployer address:", deployer.address);
 
-  // 1) Deploy MyStableCoin
+  // --- Deploy original Silverbacks contracts ---
   const StableCoinFactory = await ethers.getContractFactory("MyStableCoin");
-  const stableCoin = await deployContract(StableCoinFactory, "MyStableCoin", "MyStableCoin", "MSC");
+  // Updated to pass initial supply (e.g. 10000 tokens with 18 decimals)
+  const stableCoin = await deployContract(
+    StableCoinFactory,
+    "MyStableCoin",
+    "MyStableCoin",
+    "MSC",
+    ethers.utils.parseUnits("10000", 18)
+  );
 
-  // 2) Deploy SilverbacksNFT
   const SilverbacksNFTFactory = await ethers.getContractFactory("SilverbacksNFT");
   const nft = await deployContract(SilverbacksNFTFactory, "SilverbacksNFT", "SilverbacksNFT", "SBX");
-
-  // Set the base URI for NFT metadata.
   let tx = await nft.setBaseURI("https://rays-automobile-clearly.quicknode-ipfs.com/ipfs/");
   await tx.wait();
   console.log("Base URI set for SilverbacksNFT");
 
-  // 3) Deploy SilverbacksVault
   const SilverbacksVaultFactory = await ethers.getContractFactory("SilverbacksVault");
   const vault = await deployContract(SilverbacksVaultFactory, "SilverbacksVault", stableCoin.address, nft.address);
-
-  // Configure NFT so vault can mint/burn tokens.
   tx = await nft.setVaultContract(vault.address);
   await tx.wait();
   console.log("Vault contract set in SilverbacksNFT");
 
-  // Optional: Mint some stablecoins for deployer testing.
   tx = await stableCoin.mint(deployer.address, ethers.utils.parseUnits("10000", 18));
   await tx.wait();
   console.log("Minted 10000 stablecoins to deployer.");
 
-  // Retrieve some details just for logging:
-  const stableCoinName = await stableCoin.name();
-  const stableCoinSymbol = await stableCoin.symbol();
-  const stableCoinDecimals = await stableCoin.decimals();
-  const nftName = await nft.name();
-  const nftSymbol = await nft.symbol();
+  // --- Deploy new MultiToken contracts ---
+  // Deploy three ERC20 tokens: WBTC, WETH, WLTC (using MyERC20Token)
+  const MyERC20TokenFactory = await ethers.getContractFactory("MyERC20Token");
+  const initialSupply = ethers.utils.parseUnits("1000", 18);
+  const wbtc = await deployContract(MyERC20TokenFactory, "WBTC", "WBTC", "WBTC", initialSupply);
+  const weth = await deployContract(MyERC20TokenFactory, "WETH", "WETH", "WETH", initialSupply);
+  const wltc = await deployContract(MyERC20TokenFactory, "WLTC", "WLTC", "WLTC", initialSupply);
 
-  // Get current network details.
+  // Deploy the MultiTokenNFT contract.
+  const MultiTokenNFTFactory = await ethers.getContractFactory("MultiTokenNFT");
+  const multiNFT = await deployContract(MultiTokenNFTFactory, "MultiTokenNFT", "MultiTokenNFT", "MTNFT");
+  tx = await multiNFT.setBaseURI("https://your-multitoken-nft-metadata.example/ipfs/");
+  await tx.wait();
+  console.log("Base URI set for MultiTokenNFT");
+
+  // Deploy the MultiTokenVault contract.
+  const MultiTokenVaultFactory = await ethers.getContractFactory("MultiTokenVault");
+  const multiVault = await deployContract(
+    MultiTokenVaultFactory,
+    "MultiTokenVault",
+    wbtc.address,
+    weth.address,
+    wltc.address,
+    multiNFT.address
+  );
+  tx = await multiNFT.setVaultContract(multiVault.address);
+  await tx.wait();
+  console.log("Vault contract set in MultiTokenNFT");
+
+  // --- Save deployment addresses ---
   const network = await ethers.provider.getNetwork();
   const chainIdHex = "0x" + network.chainId.toString(16);
-
-  // Example chainDataMap updated with nativeCurrency details.
-  const chainDataMap = {
-    11155111: {
-      chainName: "ethereum-sepolia",
-      rpc: process.env.RPC_URL || "",
-      explorer: "https://sepolia.etherscan.io",
-      nativeCurrency: { name: "SepoliaETH", symbol: "ETH", decimals: 18 }
-    },
-    59141: {
-      chainName: "linea-sepolia",
-      rpc: process.env.LINEA_RPC_URL || "",
-      explorer: "https://sepolia.lineascan.build",
-      nativeCurrency: { name: "LineaETH", symbol: "LineaETH", decimals: 18 }
-    },
-    31337: {
-      chainName: "hardhat",
-      rpc: "http://127.0.0.1:8545",
-      explorer: "",
-      nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }
-    }
-  };
-
-  // Fallback if the chain ID isn't recognized:
-  const extraChainData = chainDataMap[network.chainId] || {
-    chainName: network.name,
-    rpc: "",
-    explorer: "",
-    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 }
-  };
-
-  // Write deployment addresses to chains.json
   const chainsFilePath = path.join(__dirname, "..", "chains.json");
   let chains = {};
   if (fs.existsSync(chainsFilePath)) {
@@ -128,36 +115,30 @@ async function main() {
       console.error("Error reading chains.json:", err);
     }
   }
-
-  // If the chain already exists, only update the contracts object.
-  if (chains[chainIdHex]) {
-    chains[chainIdHex].contracts = {
+  chains[chainIdHex] = {
+    chainId: network.chainId,
+    chainName: network.name,
+    rpc: "",
+    explorer: "",
+    nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
+    contracts: {
       stableCoin: stableCoin.address,
       silverbacksNFT: nft.address,
-      vault: vault.address
-    };
-  } else {
-    chains[chainIdHex] = {
-      chainId: network.chainId,
-      chainName: extraChainData.chainName,
-      rpc: extraChainData.rpc,
-      explorer: extraChainData.explorer,
-      nativeCurrency: extraChainData.nativeCurrency,
-      contracts: {
-        stableCoin: stableCoin.address,
-        silverbacksNFT: nft.address,
-        vault: vault.address
-      }
-    };
-  }
-
+      vault: vault.address,
+      wbtc: wbtc.address,
+      weth: weth.address,
+      wltc: wltc.address,
+      multiTokenNFT: multiNFT.address,
+      multiTokenVault: multiVault.address
+    }
+  };
   try {
     fs.writeFileSync(chainsFilePath, JSON.stringify(chains, null, 2));
     console.log("Updated chains.json with deployment addresses for chain", chainIdHex);
   } catch (err) {
     console.error("Error writing chains.json:", err);
   }
-
+  
   console.log("Deployment complete.");
 }
 

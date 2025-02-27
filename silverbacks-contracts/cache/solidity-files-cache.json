@@ -2,8 +2,8 @@
   "_format": "hh-sol-cache-2",
   "files": {
     "C:\\Users\\hendo420\\Documents\\Github\\EthDenver-Silverbacks-2025\\silverbacks-contracts\\contracts\\MyStableCoin.sol": {
-      "lastModificationDate": 1740414230757,
-      "contentHash": "fe7d11dae82cb2e42607a19f24793f32",
+      "lastModificationDate": 1740626821079,
+      "contentHash": "18f5cec69121d72549ec0b83aed0b71d",
       "sourceName": "contracts/MyStableCoin.sol",
       "solcConfig": {
         "version": "0.8.17",
@@ -813,6 +813,122 @@
       ],
       "artifacts": [
         "ECDSA"
+      ]
+    },
+    "C:\\Users\\hendo420\\Documents\\Github\\EthDenver-Silverbacks-2025\\silverbacks-contracts\\contracts\\MultiTokenNFT.sol": {
+      "lastModificationDate": 1740629401456,
+      "contentHash": "506ced56e5271137e3dfcf50a0bb83db",
+      "sourceName": "contracts/MultiTokenNFT.sol",
+      "solcConfig": {
+        "version": "0.8.17",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol",
+        "@openzeppelin/contracts/access/Ownable.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.17"
+      ],
+      "artifacts": [
+        "MultiTokenNFT"
+      ]
+    },
+    "C:\\Users\\hendo420\\Documents\\Github\\EthDenver-Silverbacks-2025\\silverbacks-contracts\\contracts\\MultiTokenVault.sol": {
+      "lastModificationDate": 1740629412415,
+      "contentHash": "4a24b2a88fd4adc43328006519691b41",
+      "sourceName": "contracts/MultiTokenVault.sol",
+      "solcConfig": {
+        "version": "0.8.17",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "hardhat/console.sol",
+        "@openzeppelin/contracts/access/Ownable.sol",
+        "@openzeppelin/contracts/token/ERC20/IERC20.sol",
+        "./MultiTokenNFT.sol",
+        "@openzeppelin/contracts/utils/cryptography/ECDSA.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.17"
+      ],
+      "artifacts": [
+        "MultiTokenVault"
+      ]
+    },
+    "C:\\Users\\hendo420\\Documents\\Github\\EthDenver-Silverbacks-2025\\silverbacks-contracts\\contracts\\MyERC20Token.sol": {
+      "lastModificationDate": 1740626477320,
+      "contentHash": "72af71f04b1dd73b9daa383f26c1bfdc",
+      "sourceName": "contracts/MyERC20Token.sol",
+      "solcConfig": {
+        "version": "0.8.17",
+        "settings": {
+          "optimizer": {
+            "enabled": true,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [
+        "@openzeppelin/contracts/token/ERC20/ERC20.sol"
+      ],
+      "versionPragmas": [
+        "^0.8.17"
+      ],
+      "artifacts": [
+        "MyERC20Token"
       ]
     }
   }

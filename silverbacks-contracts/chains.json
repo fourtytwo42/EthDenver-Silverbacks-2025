@@ -20,23 +20,24 @@
     }
   },
   "0xe705": {
-    "chainId": "0xe705",
-    "chainName": "Linea Sepolia",
-    "rpcUrls": [
-      "https://linea-sepolia.infura.io"
-    ],
-    "blockExplorerUrls": [
-      "https://sepolia.lineascan.build"
-    ],
+    "chainId": 59141,
+    "chainName": "unknown",
+    "rpc": "",
+    "explorer": "",
     "nativeCurrency": {
-      "name": "LineaETH",
-      "symbol": "LineaETH",
+      "name": "ETH",
+      "symbol": "ETH",
       "decimals": 18
     },
     "contracts": {
-      "stableCoin": "0x41d155e3f2049aC80A3fC7a7365A75E309290D03",
-      "silverbacksNFT": "0xC887Da95260652d9813685b0939d4caD4520540D",
-      "vault": "0xefC911eDde86be74CaF57810F71F1fd9eb357cc6"
+      "stableCoin": "0x2Cb2e60206cB310FBEE1F05b2008C9b9Ebb5E7FE",
+      "silverbacksNFT": "0x691e73Dd6d2B9FD0E7dF5C6d213284fcA98b5427",
+      "vault": "0xB39984DBE35367E56F61178D88c4088b7290B066",
+      "wbtc": "0x6B8239D5C8F84302F60c6eA73A1A0B274f00eE7A",
+      "weth": "0xF53C6310e64C49D241D35295192e3828b19bBBe4",
+      "wltc": "0x4a11391593D221b69067D85261fAe56443D89B95",
+      "multiTokenNFT": "0x89F197339d351B231FC883563f328bE19bbc0e86",
+      "multiTokenVault": "0x08950cc3399B83839AE3EF56E2E865Eb3AcB7728"
     }
   }
 }
