@@ -25,7 +25,7 @@ const vaultABI = [
 ];
 
 const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
-  // Render a banner showing the target network
+  // Render a banner showing the target network.
   const renderNetworkBanner = () => (
     <div
       style={{
@@ -40,7 +40,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     </div>
   );
 
-  // Extract URL query parameters
+  // Extract URL query parameters.
   const [searchParams] = useSearchParams();
   const urlNetworkParam = searchParams.get("network");
   const urlAddress = searchParams.get("address") || "";
@@ -54,7 +54,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       })()
     : "";
 
-  // State variables
+  // State variables.
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNFTs] = useState([]);
   const [myNfts, setMyNFTs] = useState([]);
@@ -73,7 +73,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   const [selectedDeviceId, setSelectedDeviceId] = useState(null);
   const [showWalletPrompt, setShowWalletPrompt] = useState(false);
 
-  // Logging helper
+  // Logging helper.
   const log = (msg) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${msg}`);
@@ -81,50 +81,54 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   };
 
   // ------------------------------------------------------------------
-  // getProvider: Returns a provider and attempts to switch/add network
-  // if a URL parameter is provided.
+  // getProvider: Returns a provider and attempts to switch/add network if a URL parameter is provided.
   // ------------------------------------------------------------------
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       if (urlNetworkParam) {
-        // Look up target chain by matching the network name in chains.json
         const chainKeys = Object.keys(chains);
         const targetChainKey = chainKeys.find((key) =>
           chains[key].chainName.toLowerCase().includes(urlNetworkParam.toLowerCase())
         );
         if (targetChainKey) {
-          const targetChainId = targetChainKey; // e.g., "0xe705"
+          const targetChainId = targetChainKey;
           const network = await provider.getNetwork();
           const currentChainIdHex = "0x" + network.chainId.toString(16);
           if (currentChainIdHex.toLowerCase() !== targetChainId.toLowerCase()) {
-            log(`Current chain (${currentChainIdHex}) does not match target (${targetChainId}). Attempting to switch...`);
+            log(
+              `Current chain (${currentChainIdHex}) does not match target (${targetChainId}). Attempting to switch...`
+            );
             try {
               await window.ethereum.request({
                 method: "wallet_switchEthereumChain",
                 params: [{ chainId: targetChainId }],
               });
-              // Wait for the network change to propagate
               await new Promise((resolve) => setTimeout(resolve, 1000));
             } catch (switchError) {
               if (switchError.code === 4902) {
-                log(`Network ${targetChainId} is not added to your wallet. Attempting to add it...`);
+                log(
+                  `Network ${targetChainId} is not added to your wallet. Attempting to add it...`
+                );
                 const targetChainData = chains[targetChainId];
                 if (targetChainData) {
                   const addChainParams = {
                     chainId: targetChainId,
                     chainName: targetChainData.chainName,
                     rpcUrls: targetChainData.rpc ? [targetChainData.rpc] : [],
-                    blockExplorerUrls: targetChainData.explorer ? [targetChainData.explorer] : [],
-                    nativeCurrency: targetChainData.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 }
+                    blockExplorerUrls: targetChainData.explorer
+                      ? [targetChainData.explorer]
+                      : [],
+                    nativeCurrency:
+                      targetChainData.nativeCurrency ||
+                      { name: "ETH", symbol: "ETH", decimals: 18 }
                   };
                   try {
                     await window.ethereum.request({
                       method: "wallet_addEthereumChain",
                       params: [addChainParams],
                     });
-                    // After adding, try switching again
                     await window.ethereum.request({
                       method: "wallet_switchEthereumChain",
                       params: [{ chainId: targetChainId }],
@@ -140,9 +144,13 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                 }
               } else if (
                 switchError.message &&
-                switchError.message.includes("The request has been rejected due to a change in selected network")
+                switchError.message.includes(
+                  "The request has been rejected due to a change in selected network"
+                )
               ) {
-                log("Network switch request rejected due to a change in selected network. Please manually switch to the target network.");
+                log(
+                  "Network switch request rejected due to a change in selected network. Please manually switch to the target network."
+                );
               } else {
                 log("Error switching network: " + switchError.message);
                 throw new Error("Error switching network: " + switchError.message);
@@ -153,7 +161,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       }
       return provider;
     } else {
-      // Fallback: use a default JSON-RPC provider (defaulting to chain "0xaa36a7")
       let targetChain = "0xaa36a7";
       const rpcUrl =
         chains[targetChain] &&
@@ -171,7 +178,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
 
   // ------------------------------------------------------------------
   // loadContracts: Loads contract addresses based on the current chain.
-  // Retries if a network change error occurs.
   // ------------------------------------------------------------------
   const loadContracts = async () => {
     try {
@@ -272,7 +278,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   }, [originalEncryptedPk, urlAddress]);
 
   // ------------------------------------------------------------------
-  // Load NFTs owned by the ephemeral address (from URL)
+  // Load NFTs owned by the ephemeral address (from URL).
   // ------------------------------------------------------------------
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
@@ -376,7 +382,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   }, [currentAccount, contractAddresses]);
 
   // ------------------------------------------------------------------
-  // Enumerate video devices when scanning
+  // Enumerate video devices when scanning.
   // ------------------------------------------------------------------
   useEffect(() => {
     if (scanning) {
@@ -405,18 +411,20 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   }, [scanning]);
 
   // ------------------------------------------------------------------
-  // Initiate action via QR scanner
+  // Initiate action via QR scanner.
   // ------------------------------------------------------------------
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
     setPendingAction(action);
     setStopStream(false);
     setScanning(true);
-    log(`Initiated ${action} for tokenId=${tokenId}. Please scan the ephemeral key’s QR code.`);
+    log(
+      `Initiated ${action} for tokenId=${tokenId}. Please scan the ephemeral key’s QR code.`
+    );
   };
 
   // ------------------------------------------------------------------
-  // Handle QR scan result
+  // Handle QR scan result.
   // ------------------------------------------------------------------
   const handleScan = async (err, result) => {
     if (err) {
@@ -427,7 +435,8 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       log("QR scan result received.");
       setStopStream(true);
       setScanning(false);
-      let scannedKey = typeof result === "object" && result.text ? result.text : String(result);
+      let scannedKey =
+        typeof result === "object" && result.text ? result.text : String(result);
       log(`Extracted decryption key from QR code: ${scannedKey}`);
       try {
         const iv = CryptoJS.enc.Hex.parse("00000000000000000000000000000000");
@@ -447,7 +456,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         const ephemeralAddress = ephemeralWallet.address;
         log(`Ephemeral wallet address: ${ephemeralAddress}`);
         if (ephemeralAddress.toLowerCase() !== ownerAddress.toLowerCase()) {
-          log(`ERROR: ephemeral address ${ephemeralAddress} does not match URL address ${ownerAddress}.`);
+          log(
+            `ERROR: ephemeral address ${ephemeralAddress} does not match URL address ${ownerAddress}.`
+          );
           return;
         }
         await executeAction(pendingTokenId, pendingAction, ephemeralPk);
@@ -458,7 +469,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   };
 
   // ------------------------------------------------------------------
-  // Execute action (redeem or claim) for ephemeral NFTs
+  // Execute action (redeem or claim) for ephemeral NFTs.
   // ------------------------------------------------------------------
   const executeAction = async (tokenId, action, ephemeralPrivateKey) => {
     try {
@@ -468,6 +479,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       const signer = provider.getSigner();
       const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
       if (action === "redeem") {
+        // Redeem: burn the NFT and send $100 stablecoin to the NFT owner.
         msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Redeem:", tokenId]);
         const messageHashBytes = ethers.utils.arrayify(msg);
         signature = await ephemeralWallet.signMessage(messageHashBytes);
@@ -479,6 +491,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         loadRedeemNFTs();
         loadERC20Balance();
       } else if (action === "claim") {
+        // Claim: transfer the NFT from the ephemeral wallet to your connected wallet.
         msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Claim:", tokenId]);
         const messageHashBytes = ethers.utils.arrayify(msg);
         signature = await ephemeralWallet.signMessage(messageHashBytes);
@@ -495,7 +508,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   };
 
   // ------------------------------------------------------------------
-  // Handle redemption of connected wallet's NFT
+  // Handle redemption of connected wallet's NFT.
   // ------------------------------------------------------------------
   const handleRedeemConnected = async (tokenId) => {
     try {
@@ -514,7 +527,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   };
 
   // ------------------------------------------------------------------
-  // Handle sending NFT from connected wallet
+  // Handle sending NFT from connected wallet.
   // ------------------------------------------------------------------
   const handleSendNFT = async (tokenId) => {
     const recipient = prompt("Enter the recipient address:");
@@ -537,7 +550,45 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   };
 
   // ------------------------------------------------------------------
-  // Render missing network prompt if needed
+  // Render the ephemeral section based on whether an NFT is present.
+  // ------------------------------------------------------------------
+  const renderEphemeralSection = () => {
+    if (!ownerAddress) return null;
+    if (redeemNfts.length > 0) {
+      return (
+        <div style={{ marginBottom: "1rem", padding: "1rem", backgroundColor: "#eef7f5", borderRadius: "8px" }}>
+          <h2 style={{ marginBottom: "0.5rem", textAlign: "center" }}>Bill Verified</h2>
+          <p style={{ fontSize: "1rem", textAlign: "center" }}>
+            Redeem: Burns the NFT and credits your wallet with $100 in stablecoin.
+            <br />
+            Claim: Transfers the NFT from the ephemeral wallet to your connected wallet.
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", marginTop: "1rem" }}>
+            {redeemNfts.map((n) => (
+              <NFTCard
+                key={n.tokenId}
+                nft={n}
+                pk={ephemeralDisplayPk}
+                handleRedeemTo={() => initiateAction(n.tokenId, "redeem")}
+                handleClaimNFT={() => initiateAction(n.tokenId, "claim")}
+                handleRedeem={() => {}}
+                handleSendNFT={() => {}}
+              />
+            ))}
+          </div>
+        </div>
+      );
+    } else {
+      return (
+        <div style={{ marginBottom: "1rem", padding: "1rem", backgroundColor: "#fce4e4", borderRadius: "8px", textAlign: "center" }}>
+          <h2 style={{ marginBottom: "0.5rem" }}>Bill has been redeemed or is Invalid</h2>
+        </div>
+      );
+    }
+  };
+
+  // ------------------------------------------------------------------
+  // Render missing network prompt if needed.
   // ------------------------------------------------------------------
   const renderMissingNetworkPrompt = () => (
     <div
@@ -584,7 +635,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   );
 
   // ------------------------------------------------------------------
-  // Main render
+  // Main render.
   // ------------------------------------------------------------------
   return (
     <div style={{ padding: 0, margin: 0, backgroundColor: "#f9f9f9", minHeight: "100vh" }}>
@@ -638,34 +689,8 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
           </div>
         )}
 
-        {/* Ephemeral NFT redemption section */}
-        {ownerAddress && (
-          <div style={{ marginBottom: "1rem" }}>
-            <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>
-              Redeem NFTs for Ephemeral Address:
-            </h2>
-            <code style={{ fontSize: "0.9rem" }}>{ownerAddress}</code>
-            {redeemNfts.length > 0 ? (
-              <div style={{ display: "flex", flexWrap: "wrap", marginTop: "1rem" }}>
-                {redeemNfts.map((n) => (
-                  <NFTCard
-                    key={n.tokenId}
-                    nft={n}
-                    pk={ephemeralDisplayPk}
-                    handleRedeemTo={() => initiateAction(n.tokenId, "redeem")}
-                    handleClaimNFT={() => initiateAction(n.tokenId, "claim")}
-                    handleRedeem={() => {}}
-                    handleSendNFT={() => {}}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p style={{ fontSize: "1rem" }}>
-                No redeemable NFTs found for ephemeral address {ownerAddress}
-              </p>
-            )}
-          </div>
-        )}
+        {/* Ephemeral Section (dynamic based on NFT presence) */}
+        {ownerAddress && renderEphemeralSection()}
 
         {/* Connected wallet NFT section */}
         {currentAccount && (
