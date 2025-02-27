@@ -80,10 +80,10 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
-  // -------------------------------
-  // getProvider: Returns a provider and, if a URL network is specified,
-  // attempts to switch MetaMask to that chain.
-  // -------------------------------
+  // ------------------------------------------------------------------
+  // getProvider: Returns a provider and attempts to switch/add network
+  // if a URL parameter is provided.
+  // ------------------------------------------------------------------
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
@@ -109,7 +109,35 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
               await new Promise((resolve) => setTimeout(resolve, 1000));
             } catch (switchError) {
               if (switchError.code === 4902) {
-                log(`Network ${targetChainId} is not added to your wallet.`);
+                log(`Network ${targetChainId} is not added to your wallet. Attempting to add it...`);
+                const targetChainData = chains[targetChainId];
+                if (targetChainData) {
+                  const addChainParams = {
+                    chainId: targetChainId,
+                    chainName: targetChainData.chainName,
+                    rpcUrls: targetChainData.rpc ? [targetChainData.rpc] : [],
+                    blockExplorerUrls: targetChainData.explorer ? [targetChainData.explorer] : [],
+                    nativeCurrency: targetChainData.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 }
+                  };
+                  try {
+                    await window.ethereum.request({
+                      method: "wallet_addEthereumChain",
+                      params: [addChainParams],
+                    });
+                    // After adding, try switching again
+                    await window.ethereum.request({
+                      method: "wallet_switchEthereumChain",
+                      params: [{ chainId: targetChainId }],
+                    });
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+                  } catch (addError) {
+                    log("Error adding network: " + addError.message);
+                    throw new Error("Error adding network: " + addError.message);
+                  }
+                } else {
+                  log("Network parameters not found for target chain.");
+                  throw new Error("Network parameters not found for target chain.");
+                }
               } else if (
                 switchError.message &&
                 switchError.message.includes("The request has been rejected due to a change in selected network")
@@ -125,7 +153,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       }
       return provider;
     } else {
-      // Fallback: use a default JSON-RPC provider (here defaulting to chain "0xaa36a7")
+      // Fallback: use a default JSON-RPC provider (defaulting to chain "0xaa36a7")
       let targetChain = "0xaa36a7";
       const rpcUrl =
         chains[targetChain] &&
@@ -141,10 +169,10 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // -------------------------------
+  // ------------------------------------------------------------------
   // loadContracts: Loads contract addresses based on the current chain.
-  // If an error due to network change occurs, it retries after a delay.
-  // -------------------------------
+  // Retries if a network change error occurs.
+  // ------------------------------------------------------------------
   const loadContracts = async () => {
     try {
       const provider = await getProvider();
@@ -171,9 +199,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     loadContracts();
   }, [urlNetworkParam]);
 
-  // -------------------------------
+  // ------------------------------------------------------------------
   // Listen for chain changes to refresh contracts.
-  // -------------------------------
+  // ------------------------------------------------------------------
   useEffect(() => {
     if (window.ethereum) {
       const handleChainChanged = async (chainId) => {
@@ -189,7 +217,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
           if (targetChainKey && currentChainIdHex.toLowerCase() === targetChainKey.toLowerCase()) {
             log("Required network now added. Clearing missing network prompt.");
             setMissingNetworkInfo(null);
-            // Refresh contract addresses once the network is correct.
             loadContracts();
           }
         } catch (e) {
@@ -205,9 +232,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [urlNetworkParam]);
 
-  // -------------------------------
-  // Load ERC20 balance for connected wallet
-  // -------------------------------
+  // ------------------------------------------------------------------
+  // Load ERC20 balance for connected wallet.
+  // ------------------------------------------------------------------
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
     try {
@@ -232,9 +259,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // -------------------------------
-  // Set NFT owner address from URL parameters
-  // -------------------------------
+  // ------------------------------------------------------------------
+  // Set NFT owner address from URL parameters.
+  // ------------------------------------------------------------------
   useEffect(() => {
     if (originalEncryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
       setOwnerAddress(urlAddress);
@@ -244,9 +271,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [originalEncryptedPk, urlAddress]);
 
-  // -------------------------------
+  // ------------------------------------------------------------------
   // Load NFTs owned by the ephemeral address (from URL)
-  // -------------------------------
+  // ------------------------------------------------------------------
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
     try {
@@ -296,9 +323,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [ownerAddress, contractAddresses]);
 
-  // -------------------------------
-  // Load NFTs owned by the connected wallet
-  // -------------------------------
+  // ------------------------------------------------------------------
+  // Load NFTs owned by the connected wallet.
+  // ------------------------------------------------------------------
   const loadMyNFTs = async () => {
     if (!currentAccount || !contractAddresses) return;
     try {
@@ -348,9 +375,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // -------------------------------
+  // ------------------------------------------------------------------
   // Enumerate video devices when scanning
-  // -------------------------------
+  // ------------------------------------------------------------------
   useEffect(() => {
     if (scanning) {
       async function enumerateDevices() {
@@ -377,9 +404,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [scanning]);
 
-  // -------------------------------
+  // ------------------------------------------------------------------
   // Initiate action via QR scanner
-  // -------------------------------
+  // ------------------------------------------------------------------
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
     setPendingAction(action);
@@ -388,9 +415,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     log(`Initiated ${action} for tokenId=${tokenId}. Please scan the ephemeral key’s QR code.`);
   };
 
-  // -------------------------------
+  // ------------------------------------------------------------------
   // Handle QR scan result
-  // -------------------------------
+  // ------------------------------------------------------------------
   const handleScan = async (err, result) => {
     if (err) {
       log(`QR Reader error: ${err.message}`);
@@ -430,9 +457,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // -------------------------------
+  // ------------------------------------------------------------------
   // Execute action (redeem or claim) for ephemeral NFTs
-  // -------------------------------
+  // ------------------------------------------------------------------
   const executeAction = async (tokenId, action, ephemeralPrivateKey) => {
     try {
       const ephemeralWallet = new ethers.Wallet(ephemeralPrivateKey);
@@ -467,9 +494,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // -------------------------------
+  // ------------------------------------------------------------------
   // Handle redemption of connected wallet's NFT
-  // -------------------------------
+  // ------------------------------------------------------------------
   const handleRedeemConnected = async (tokenId) => {
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -486,9 +513,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // -------------------------------
+  // ------------------------------------------------------------------
   // Handle sending NFT from connected wallet
-  // -------------------------------
+  // ------------------------------------------------------------------
   const handleSendNFT = async (tokenId) => {
     const recipient = prompt("Enter the recipient address:");
     if (!recipient || !ethers.utils.isAddress(recipient)) {
@@ -509,9 +536,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // -------------------------------
+  // ------------------------------------------------------------------
   // Render missing network prompt if needed
-  // -------------------------------
+  // ------------------------------------------------------------------
   const renderMissingNetworkPrompt = () => (
     <div
       style={{
@@ -556,9 +583,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     </div>
   );
 
-  // -------------------------------
+  // ------------------------------------------------------------------
   // Main render
-  // -------------------------------
+  // ------------------------------------------------------------------
   return (
     <div style={{ padding: 0, margin: 0, backgroundColor: "#f9f9f9", minHeight: "100vh" }}>
       {missingNetworkInfo && renderMissingNetworkPrompt()}
