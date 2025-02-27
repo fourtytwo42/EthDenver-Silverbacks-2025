@@ -740,7 +740,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
             }}
           >
             <h4 style={{ color: "#fff", marginBottom: "1rem" }}>
-              Scan ephemeral key QR code
+              Scratch off and scan QR code
             </h4>
             <BarcodeScannerComponent
               delay={100}
@@ -754,27 +754,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
               }
               onUpdate={handleScan}
             />
-            {videoDevices.length > 1 && (
-              <button
-                style={{
-                  marginTop: "0.5rem",
-                  padding: "0.5rem 1rem",
-                  backgroundColor: "#555",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: "pointer"
-                }}
-                onClick={() => {
-                  const nextIndex = (selectedCameraIndex + 1) % videoDevices.length;
-                  setSelectedCameraIndex(nextIndex);
-                  setSelectedDeviceId(videoDevices[nextIndex].deviceId);
-                  log(`Switching to camera: ${videoDevices[nextIndex].label || "unknown"}`);
-                }}
-              >
-                Switch Camera
-              </button>
-            )}
             <button
               style={{
                 marginTop: "0.5rem",
