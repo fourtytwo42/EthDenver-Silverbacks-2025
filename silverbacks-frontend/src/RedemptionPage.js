@@ -206,38 +206,42 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     loadContracts();
   }, [urlNetworkParam]);
 
-  // ------------------------------------------------------------------
-  // Listen for chain changes to refresh contracts.
-  // ------------------------------------------------------------------
+  // --- NEW: Automatically add stablecoin to wallet ---
   useEffect(() => {
-    if (window.ethereum) {
-      const handleChainChanged = async (chainId) => {
-        log("Chain changed: " + chainId);
-        try {
-          const provider = await getProvider();
-          const network = await provider.getNetwork();
-          const currentChainIdHex = "0x" + network.chainId.toString(16);
-          const chainKeys = Object.keys(chains);
-          const targetChainKey = chainKeys.find((key) =>
-            chains[key].chainName.toLowerCase().includes(urlNetworkParam.toLowerCase())
-          );
-          if (targetChainKey && currentChainIdHex.toLowerCase() === targetChainKey.toLowerCase()) {
-            log("Required network now added. Clearing missing network prompt.");
-            setMissingNetworkInfo(null);
-            loadContracts();
+    if (window.ethereum && contractAddresses && contractAddresses.stableCoin) {
+      // Use the token address from the contract addresses.
+      const tokenAddress = contractAddresses.stableCoin;
+      // Update these values as needed; here we use "MSC" and 18 decimals.
+      const tokenSymbol = "MSC";
+      const tokenDecimals = 18;
+      // Optionally provide a token image URL if you have one.
+      const tokenImage = ""; // e.g., "https://yourdomain.com/path/to/token-image.png"
+      window.ethereum
+        .request({
+          method: "wallet_watchAsset",
+          params: {
+            type: "ERC20",
+            options: {
+              address: tokenAddress,
+              symbol: tokenSymbol,
+              decimals: tokenDecimals,
+              image: tokenImage,
+            },
+          },
+        })
+        .then((success) => {
+          if (success) {
+            log("Stablecoin token added to wallet");
+          } else {
+            log("Stablecoin token addition rejected");
           }
-        } catch (e) {
-          log("Error checking chain after change: " + e.message);
-        }
-      };
-      window.ethereum.on("chainChanged", handleChainChanged);
-      return () => {
-        if (window.ethereum.removeListener) {
-          window.ethereum.removeListener("chainChanged", handleChainChanged);
-        }
-      };
+        })
+        .catch((error) => {
+          log("Error adding stablecoin token: " + error.message);
+        });
     }
-  }, [urlNetworkParam]);
+  }, [contractAddresses]);
+  // --- End NEW ---
 
   // ------------------------------------------------------------------
   // Load ERC20 balance for connected wallet.
