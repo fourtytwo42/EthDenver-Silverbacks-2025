@@ -25,23 +25,21 @@ const vaultABI = [
 ];
 
 const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
-  // Detect mobile browser using a simple regex.
+  // Detect mobile browser
   const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
-  // New: wallet selection modal for mobile browsers (when no wallet is connected)
+  // New: Wallet selection for mobile devices when no wallet is connected.
   const handleMobileWalletSelection = (walletType) => {
     const currentUrl = window.location.href;
     if (walletType === "coinbase") {
       window.location.href = `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(currentUrl)}`;
     } else if (walletType === "metamask") {
-      // MetaMask deep link: preserve hostname, pathname, and query.
       const domain = window.location.hostname;
       const pathAndQuery = window.location.pathname + window.location.search;
       window.location.href = `https://metamask.app.link/dapp/${domain}${pathAndQuery}`;
     }
   };
 
-  // Styles for the mobile wallet selection modal.
   const walletSelectionModalStyle = {
     position: "fixed",
     top: 0,
@@ -70,7 +68,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     margin: "0.5rem"
   };
 
-  // Style for desktop wallet install prompt.
   const walletInstallPromptStyle = {
     padding: "1rem",
     backgroundColor: "#ffcccc",
@@ -79,7 +76,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     marginBottom: "1rem"
   };
 
-  // Header area renders a banner with network and balance info.
+  // Header area for network and balance info
   const renderHeaderArea = () => (
     <div
       style={{
@@ -139,7 +136,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   };
 
   // ------------------------------------------------------------------
-  // getProvider: Returns a provider and attempts to switch/add network if a URL parameter is provided.
+  // getProvider: Returns a provider and attempts to switch/add network if needed.
   // ------------------------------------------------------------------
   const getProvider = async () => {
     if (window.ethereum) {
@@ -260,36 +257,41 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     loadContracts();
   }, [urlNetworkParam]);
 
-  // --- NEW: Automatically add stablecoin to wallet ---
+  // --- Automatically add stablecoin token if not already added ---
   useEffect(() => {
     if (window.ethereum && contractAddresses && contractAddresses.stableCoin) {
-      const tokenAddress = contractAddresses.stableCoin;
-      const tokenSymbol = "MSC";
-      const tokenDecimals = 18;
-      const tokenImage = "";
-      window.ethereum
-        .request({
-          method: "wallet_watchAsset",
-          params: {
-            type: "ERC20",
-            options: {
-              address: tokenAddress,
-              symbol: tokenSymbol,
-              decimals: tokenDecimals,
-              image: tokenImage,
+      if (!localStorage.getItem("stablecoinAdded")) {
+        const tokenAddress = contractAddresses.stableCoin;
+        const tokenSymbol = "MSC";
+        const tokenDecimals = 18;
+        const tokenImage = "";
+        window.ethereum
+          .request({
+            method: "wallet_watchAsset",
+            params: {
+              type: "ERC20",
+              options: {
+                address: tokenAddress,
+                symbol: tokenSymbol,
+                decimals: tokenDecimals,
+                image: tokenImage,
+              },
             },
-          },
-        })
-        .then((success) => {
-          if (success) {
-            log("Stablecoin token added to wallet");
-          } else {
-            log("Stablecoin token addition rejected");
-          }
-        })
-        .catch((error) => {
-          log("Error adding stablecoin token: " + error.message);
-        });
+          })
+          .then((success) => {
+            if (success) {
+              log("Stablecoin token added to wallet");
+              localStorage.setItem("stablecoinAdded", "true");
+            } else {
+              log("Stablecoin token addition rejected");
+            }
+          })
+          .catch((error) => {
+            log("Error adding stablecoin token: " + error.message);
+          });
+      } else {
+        log("Stablecoin token already added, skipping.");
+      }
     }
   }, [contractAddresses]);
 
@@ -684,11 +686,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   );
 
   // ------------------------------------------------------------------
-  // Load ERC20 balance for connected wallet.
-  // (Already implemented above.)
-  // ------------------------------------------------------------------
-
-  // ------------------------------------------------------------------
   // Mobile wallet selection prompt (only on mobile and when no wallet is connected)
   // ------------------------------------------------------------------
   const renderMobileWalletSelection = () => (
@@ -736,8 +733,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       {!isMobile && !window.ethereum && renderDesktopWalletInstallPrompt()}
       {renderHeaderArea()}
       <div style={{ width: "100%", maxWidth: "600px", padding: "1rem" }}>
-        {/* Wallet Prompt Overlay */}
-        {/* (Existing connected wallet prompt code remains unchanged) */}
         {/* Ephemeral Section */}
         {ownerAddress && renderEphemeralSection()}
         {/* Connected wallet NFT section */}
