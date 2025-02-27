@@ -32,7 +32,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   const handleMobileWalletSelection = (walletType) => {
     const currentUrl = window.location.href;
     if (walletType === "coinbase") {
-      window.location.href = `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(currentUrl)}`;
+      window.location.href = `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(
+        currentUrl
+      )}`;
     } else if (walletType === "metamask") {
       const domain = window.location.hostname;
       const pathAndQuery = window.location.pathname + window.location.search;
@@ -464,6 +466,37 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   }, [scanning]);
 
   // ------------------------------------------------------------------
+  // New: Auto-connect wallet if running inside a Coinbase or MetaMask in-app browser on mobile.
+  // ------------------------------------------------------------------
+  const connectWallet = async () => {
+    if (!window.ethereum) {
+      alert("Web3 wallet is not installed!");
+      return;
+    }
+    try {
+      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+      const account = accounts[0];
+      setCurrentAccount(account);
+      log("Wallet connected: " + account);
+    } catch (error) {
+      console.error("Error connecting wallet:", error);
+      log("Error connecting wallet: " + error.message);
+    }
+  };
+
+  useEffect(() => {
+    if (
+      isMobile &&
+      !currentAccount &&
+      window.ethereum &&
+      (window.ethereum.isCoinbaseWallet || window.ethereum.isMetaMask)
+    ) {
+      log("Detected in-app wallet, auto connecting...");
+      connectWallet();
+    }
+  }, [isMobile, currentAccount]);
+
+  // ------------------------------------------------------------------
   // Initiate action via QR scanner.
   // ------------------------------------------------------------------
   const initiateAction = (tokenId, action) => {
@@ -687,6 +720,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
 
   // ------------------------------------------------------------------
   // Mobile wallet selection prompt (only on mobile and when no wallet is connected)
+  // Updated to show only when no in-app wallet is detected.
   // ------------------------------------------------------------------
   const renderMobileWalletSelection = () => (
     <div style={walletSelectionModalStyle}>
@@ -702,7 +736,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   );
 
   // ------------------------------------------------------------------
-  // Desktop wallet install prompt if no web3 wallet is detected.
+  // Render desktop wallet install prompt if no web3 wallet is detected.
   // ------------------------------------------------------------------
   const renderDesktopWalletInstallPrompt = () => (
     <div style={walletInstallPromptStyle}>
@@ -727,8 +761,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         overflowX: "hidden"
       }}
     >
-      {/* Mobile wallet selection modal */}
-      {isMobile && !currentAccount && renderMobileWalletSelection()}
+      {/* Mobile wallet selection modal:
+          Only render if on mobile, no wallet connected, and if no in-app wallet is detected */}
+      {isMobile && !currentAccount && (!window.ethereum || !(window.ethereum.isCoinbaseWallet || window.ethereum.isMetaMask)) && renderMobileWalletSelection()}
       {/* Desktop wallet install prompt */}
       {!isMobile && !window.ethereum && renderDesktopWalletInstallPrompt()}
       {renderHeaderArea()}
