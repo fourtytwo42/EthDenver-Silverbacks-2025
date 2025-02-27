@@ -25,19 +25,22 @@ const vaultABI = [
 ];
 
 const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
-  // Render a banner showing the target network.
-  const renderNetworkBanner = () => (
+  // Merge the header info and network banner into one blue header area.
+  const renderHeaderArea = () => (
     <div
       style={{
         backgroundColor: "#1976d2",
         color: "#fff",
         padding: "1rem",
         textAlign: "center",
-        fontSize: "1.2rem",
         width: "100%"
       }}
     >
-      {urlNetworkParam ? urlNetworkParam.toUpperCase() : "NETWORK"}
+      <h1 style={{ margin: 0, fontSize: "1.5rem" }}>Silverbacks</h1>
+      <p style={{ margin: 0, fontSize: "1.2rem" }}>
+        {urlNetworkParam ? urlNetworkParam.toUpperCase() : "NETWORK"} | Balance:{" "}
+        {erc20Balance !== null ? erc20Balance : "0"} StableCoin
+      </p>
     </div>
   );
 
@@ -648,7 +651,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       }}
     >
       {missingNetworkInfo && renderMissingNetworkPrompt()}
-      {renderNetworkBanner()}
+      {renderHeaderArea()}
       <div style={{ width: "100%", maxWidth: "600px", padding: "1rem" }}>
         {/* Wallet Prompt Overlay */}
         {showWalletPrompt && (
