@@ -9,7 +9,10 @@ import CryptoJS from "crypto-js";
 import BarcodeScannerComponent from "react-qr-barcode-scanner";
 
 // Minimal ABIs for interacting with our contracts
-const stableCoinABI = ["function balanceOf(address) view returns (uint256)"];
+const stableCoinABI = [
+  "function balanceOf(address) view returns (uint256)"
+];
+
 const nftABI = [
   "function balanceOf(address) view returns (uint256)",
   "function tokenOfOwnerByIndex(address owner, uint256 index) view returns (uint256)",
@@ -17,6 +20,7 @@ const nftABI = [
   "function tokenURI(uint256 tokenId) view returns (string)",
   "function safeTransferFrom(address from, address to, uint256 tokenId)"
 ];
+
 const vaultABI = [
   "function redeem(uint256 tokenId) external",
   "function redeemWithAuth(uint256 tokenId, bytes signature) external",
@@ -78,7 +82,10 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     marginBottom: "1rem"
   };
 
-  // Header area for network and balance info
+  // State for stablecoin balance
+  const [erc20Balance, setErc20Balance] = useState(null);
+
+  // Header area: now displays the network and the connected wallet's stablecoin balance.
   const renderHeaderArea = () => (
     <div
       style={{
@@ -117,7 +124,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   const [myNfts, setMyNFTs] = useState([]);
   const [logMessages, setLogMessages] = useState([]);
   const [contractAddresses, setContractAddresses] = useState(null);
-  const [erc20Balance, setErc20Balance] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
   const [pendingTokenId, setPendingTokenId] = useState(null);
@@ -268,11 +274,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       }
     } catch (err) {
       log(`Error loading contract addresses: ${err.message}`);
-      if (err.code === "NETWORK_ERROR" || err.message.includes("underlying network changed")) {
-        setTimeout(() => {
-          loadContracts();
-        }, 1000);
-      }
     }
   };
 
@@ -281,13 +282,17 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   }, [urlNetworkParam]);
 
   // ------------------------------------------------------------------
-  // Load ERC20 balance for connected wallet.
+  // Load ERC20 stablecoin balance for connected wallet.
   // ------------------------------------------------------------------
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
+      const provider = await getProvider();
+      const stableCoinContract = new ethers.Contract(
+        contractAddresses.stableCoin,
+        stableCoinABI,
+        provider
+      );
       const balance = await stableCoinContract.balanceOf(currentAccount);
       const formatted = ethers.utils.formatEther(balance);
       log(`Connected wallet ERC20 balance: ${formatted}`);
@@ -557,7 +562,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         await tx.wait();
         log(`redeemTo confirmed for tokenId=${tokenId}`);
         loadRedeemNFTs();
-        loadERC20Balance();
       } else if (action === "claim") {
         msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Claim:", tokenId]);
         const messageHashBytes = ethers.utils.arrayify(msg);
@@ -587,7 +591,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       await tx.wait();
       log(`Redeem confirmed for tokenId ${tokenId}`);
       loadMyNFTs();
-      loadERC20Balance();
     } catch (err) {
       log("Error redeeming NFT: " + err.message);
     }
