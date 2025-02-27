@@ -32,7 +32,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   // Detect mobile browser
   const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
-  // --- Mobile Wallet Selection ---
+  // New: Wallet selection for mobile devices when no wallet is connected.
   const handleMobileWalletSelection = (walletType) => {
     const currentUrl = window.location.href;
     if (walletType === "coinbase") {
@@ -74,6 +74,14 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     margin: "0.5rem"
   };
 
+  // Disabled style for MetaMask wallet button
+  const disabledWalletButtonStyle = {
+    ...walletButtonStyle,
+    backgroundColor: "#9e9e9e",
+    cursor: "not-allowed",
+    opacity: 0.6
+  };
+
   const walletInstallPromptStyle = {
     padding: "1rem",
     backgroundColor: "#ffcccc",
@@ -82,25 +90,43 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     marginBottom: "1rem"
   };
 
-  // --- State Variables ---
-  const [erc20Balance, setErc20Balance] = useState(null);
-  const [logMessages, setLogMessages] = useState([]);
-  const [contractAddresses, setContractAddresses] = useState(null);
-  const [connectedNetworkName, setConnectedNetworkName] = useState("NETWORK");
-  const [scanning, setScanning] = useState(false);
-  const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
-  const [pendingTokenId, setPendingTokenId] = useState(null);
-  const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
-  const [error, setError] = useState("");
-  const [stopStream, setStopStream] = useState(false);
-  const [videoDevices, setVideoDevices] = useState([]);
-  const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
-  const [selectedDeviceId, setSelectedDeviceId] = useState(null);
-  const [showWalletPrompt, setShowWalletPrompt] = useState(false);
-  const [myNfts, setMyNFTs] = useState([]);
-  const [redeemNfts, setRedeemNFTs] = useState([]); // <-- Declare redeemNfts state
+  // Render mobile wallet selection prompt.
+  const renderMobileWalletSelection = () => (
+    <div style={walletSelectionModalStyle}>
+      <h2>Select Wallet</h2>
+      <p>Please choose which wallet to use:</p>
+      <button onClick={() => handleMobileWalletSelection("coinbase")} style={walletButtonStyle}>
+        Coinbase Wallet
+      </button>
+      <button disabled style={disabledWalletButtonStyle}>
+        MetaMask Wallet (Unavailable)
+      </button>
+    </div>
+  );
 
-  // --- Ephemeral Parameters from URL ---
+  // State for stablecoin balance
+  const [erc20Balance, setErc20Balance] = useState(null);
+
+  // Header area: now displays the network and the connected wallet's stablecoin balance.
+  const renderHeaderArea = () => (
+    <div
+      style={{
+        backgroundColor: "#1976d2",
+        color: "#fff",
+        padding: "1rem",
+        textAlign: "center",
+        width: "100%"
+      }}
+    >
+      <h1 style={{ margin: 0, fontSize: "1.5rem" }}>Silverbacks</h1>
+      <p style={{ margin: 0, fontSize: "1.2rem" }}>
+        {urlNetworkParam ? urlNetworkParam.toUpperCase() : "NETWORK"} | Balance:{" "}
+        {erc20Balance !== null ? erc20Balance : "0"} StableCoin
+      </p>
+    </div>
+  );
+
+  // Extract URL query parameters.
   const [searchParams] = useSearchParams();
   const urlNetworkParam = searchParams.get("network");
   const urlAddress = searchParams.get("address") || "";
@@ -114,36 +140,55 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       })()
     : "";
 
-  // --- State for Ephemeral Wallet Address (from URL) ---
+  // State variables.
   const [ownerAddress, setOwnerAddress] = useState("");
+  const [redeemNfts, setRedeemNFTs] = useState([]);
+  const [myNfts, setMyNFTs] = useState([]);
+  const [logMessages, setLogMessages] = useState([]);
+  const [contractAddresses, setContractAddresses] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const [pendingAction, setPendingAction] = useState(""); // "redeem" or "claim"
+  const [pendingTokenId, setPendingTokenId] = useState(null);
+  const [decryptedPrivateKey, setDecryptedPrivateKey] = useState("");
+  const [error, setError] = useState("");
+  const [missingNetworkInfo, setMissingNetworkInfo] = useState(null);
+  const [stopStream, setStopStream] = useState(false);
+  const [videoDevices, setVideoDevices] = useState([]);
+  const [selectedCameraIndex, setSelectedCameraIndex] = useState(0);
+  const [selectedDeviceId, setSelectedDeviceId] = useState(null);
+  const [showWalletPrompt, setShowWalletPrompt] = useState(false);
 
-  // --- Logging Helper ---
+  // Logging helper.
   const log = (msg) => {
     const timestamp = new Date().toISOString();
     console.log(`[${timestamp}] ${msg}`);
     setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
-  // --- Header Area ---
-  const renderHeaderArea = () => (
-    <div
-      style={{
-        backgroundColor: "#1976d2",
-        color: "#fff",
-        padding: "1rem",
-        textAlign: "center",
-        width: "100%"
-      }}
-    >
-      <h1 style={{ margin: 0, fontSize: "1.5rem" }}>Silverbacks</h1>
-      <p style={{ margin: 0, fontSize: "1.2rem" }}>
-        {urlNetworkParam ? urlNetworkParam.toUpperCase() : connectedNetworkName.toUpperCase()} | Balance:{" "}
-        {erc20Balance !== null ? erc20Balance : "0"} StableCoin
-      </p>
-    </div>
-  );
+  // ------------------------------------------------------------------
+  // Auto-connect: If no currentAccount is set, try to load it from MetaMask.
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    if (!currentAccount && window.ethereum) {
+      window.ethereum
+        .request({ method: "eth_accounts" })
+        .then((accounts) => {
+          if (accounts && accounts.length > 0) {
+            setCurrentAccount(accounts[0]);
+            log("Auto-detected connected wallet: " + accounts[0]);
+          } else {
+            log("No connected wallet found.");
+          }
+        })
+        .catch((err) => {
+          log("Error fetching accounts: " + err.message);
+        });
+    }
+  }, [currentAccount, setCurrentAccount]);
 
-  // --- Provider Helper ---
+  // ------------------------------------------------------------------
+  // getProvider: Returns a provider and attempts to switch/add network if needed.
+  // ------------------------------------------------------------------
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
@@ -169,7 +214,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
               await new Promise((resolve) => setTimeout(resolve, 1000));
             } catch (switchError) {
               if (switchError.code === 4902) {
-                log(`Network ${targetChainId} is not added to your wallet. Attempting to add it...`);
+                log(
+                  `Network ${targetChainId} is not added to your wallet. Attempting to add it...`
+                );
                 const targetChainData = chains[targetChainId];
                 if (targetChainData) {
                   const addChainParams = {
@@ -177,7 +224,8 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                     chainName: targetChainData.chainName,
                     rpcUrls: targetChainData.rpc ? [targetChainData.rpc] : [],
                     blockExplorerUrls: targetChainData.explorer ? [targetChainData.explorer] : [],
-                    nativeCurrency: targetChainData.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 }
+                    nativeCurrency:
+                      targetChainData.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 }
                   };
                   try {
                     await window.ethereum.request({
@@ -199,7 +247,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                 }
               } else if (
                 switchError.message &&
-                switchError.message.includes("The request has been rejected due to a change in selected network")
+                switchError.message.includes(
+                  "The request has been rejected due to a change in selected network"
+                )
               ) {
                 log(
                   "Network switch request rejected due to a change in selected network. Please manually switch to the target network."
@@ -229,7 +279,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // --- Load Contract Addresses & Connected Network Name ---
+  // ------------------------------------------------------------------
+  // loadContracts: Loads contract addresses based on the current chain.
+  // ------------------------------------------------------------------
   const loadContracts = async () => {
     try {
       const provider = await getProvider();
@@ -238,11 +290,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       log(`Network chainId: ${chainIdHex}`);
       if (chains[chainIdHex] && chains[chainIdHex].contracts) {
         setContractAddresses(chains[chainIdHex].contracts);
-        setConnectedNetworkName(chains[chainIdHex].chainName);
         log(`Loaded contract addresses for chain ${chainIdHex}`);
       } else {
         log(`Contracts not defined for chain ${chainIdHex}`);
-        setConnectedNetworkName(network.name);
       }
     } catch (err) {
       log(`Error loading contract addresses: ${err.message}`);
@@ -253,7 +303,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     loadContracts();
   }, [urlNetworkParam]);
 
-  // --- Load ERC20 Stablecoin Balance ---
+  // ------------------------------------------------------------------
+  // Load ERC20 stablecoin balance for connected wallet.
+  // ------------------------------------------------------------------
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
     try {
@@ -278,7 +330,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // --- Set NFT Owner Address from URL Parameters ---
+  // ------------------------------------------------------------------
+  // Set NFT owner address from URL parameters.
+  // ------------------------------------------------------------------
   useEffect(() => {
     if (originalEncryptedPk && urlAddress && ethers.utils.isAddress(urlAddress)) {
       setOwnerAddress(urlAddress);
@@ -288,7 +342,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [originalEncryptedPk, urlAddress]);
 
-  // --- Load NFTs Owned by the Ephemeral Address ---
+  // ------------------------------------------------------------------
+  // Load NFTs owned by the ephemeral address (from URL).
+  // ------------------------------------------------------------------
   const loadRedeemNFTs = async () => {
     if (!ownerAddress || !contractAddresses) return;
     try {
@@ -328,7 +384,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         log(`No redeemable NFTs found for ephemeral address ${ownerAddress}`);
       }
     } catch (err) {
-      log(`Error loading ephemeral wallet NFTs: ${err.message}`);
+      log(`Error loading ephemeral key NFTs: ${err.message}`);
     }
   };
 
@@ -338,7 +394,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [ownerAddress, contractAddresses]);
 
-  // --- Load NFTs Owned by the Connected Wallet ---
+  // ------------------------------------------------------------------
+  // Load NFTs owned by the connected wallet.
+  // ------------------------------------------------------------------
   const loadMyNFTs = async () => {
     if (!currentAccount || !contractAddresses) return;
     try {
@@ -388,7 +446,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [currentAccount, contractAddresses]);
 
-  // --- Enumerate Video Devices for QR Scanning ---
+  // ------------------------------------------------------------------
+  // Enumerate video devices when scanning.
+  // ------------------------------------------------------------------
   useEffect(() => {
     if (scanning) {
       async function enumerateDevices() {
@@ -415,7 +475,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [scanning]);
 
-  // --- Auto-connect for In-App Wallets on Mobile ---
+  // ------------------------------------------------------------------
+  // Auto-connect for in-app wallets on mobile.
+  // ------------------------------------------------------------------
   const connectWallet = async () => {
     if (!window.ethereum) {
       alert("Web3 wallet is not installed!");
@@ -444,7 +506,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [isMobile, currentAccount]);
 
-  // --- Initiate Action via QR Scanner ---
+  // ------------------------------------------------------------------
+  // Initiate action via QR scanner.
+  // ------------------------------------------------------------------
   const initiateAction = (tokenId, action) => {
     setPendingTokenId(tokenId);
     setPendingAction(action);
@@ -455,7 +519,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     );
   };
 
-  // --- Handle QR Scan Result ---
+  // ------------------------------------------------------------------
+  // Handle QR scan result.
+  // ------------------------------------------------------------------
   const handleScan = async (err, result) => {
     if (err) {
       log(`QR Reader error: ${err.message}`);
@@ -498,7 +564,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // --- Execute Action for Ephemeral NFTs ---
+  // ------------------------------------------------------------------
+  // Execute action (redeem or claim) for ephemeral NFTs.
+  // ------------------------------------------------------------------
   const executeAction = async (tokenId, action, ephemeralPrivateKey) => {
     try {
       const ephemeralWallet = new ethers.Wallet(ephemeralPrivateKey);
@@ -532,7 +600,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // --- Handle Redemption of Connected Wallet's NFT ---
+  // ------------------------------------------------------------------
+  // Handle redemption of connected wallet's NFT.
+  // ------------------------------------------------------------------
   const handleRedeemConnected = async (tokenId) => {
     try {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -548,7 +618,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // --- Handle Sending NFT from Connected Wallet ---
+  // ------------------------------------------------------------------
+  // Handle sending NFT from connected wallet.
+  // ------------------------------------------------------------------
   const handleSendNFT = async (tokenId) => {
     const recipient = prompt("Enter the recipient address:");
     if (!recipient || !ethers.utils.isAddress(recipient)) {
@@ -569,9 +641,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // --- Render Ephemeral Section ---  
-  // (This section shows "Bill Verified" if redeemable NFTs are present;
-  // otherwise, it shows "Bill has been redeemed or is Invalid".)
+  // ------------------------------------------------------------------
+  // Render the ephemeral section based on whether an NFT is present.
+  // ------------------------------------------------------------------
   const renderEphemeralSection = () => {
     if (!ownerAddress) return null;
     if (redeemNfts.length > 0) {
@@ -607,7 +679,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // --- Render Missing Network Prompt (if applicable) ---
+  // ------------------------------------------------------------------
+  // Render missing network prompt if needed.
+  // ------------------------------------------------------------------
   const renderMissingNetworkPrompt = () => (
     <div
       style={{
@@ -628,10 +702,10 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     >
       <h2 style={{ marginBottom: "1rem" }}>Network Not Added</h2>
       <p style={{ marginBottom: "1rem", padding: "0 1rem" }}>
-        Your wallet does not have the {missingNetworkInfo?.network} network added.
+        Your wallet does not have the {missingNetworkInfo.network} network added.
         Please visit{" "}
-        <a href={missingNetworkInfo?.link} target="_blank" rel="noopener noreferrer">
-          {missingNetworkInfo?.link}
+        <a href={missingNetworkInfo.link} target="_blank" rel="noopener noreferrer">
+          {missingNetworkInfo.link}
         </a>{" "}
         to add it to your wallet, then click "Refresh".
       </p>
@@ -652,28 +726,18 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     </div>
   );
 
-  // --- Render Mobile Wallet Selection Prompt ---
-  const renderMobileWalletSelection = () => (
-    <div style={walletSelectionModalStyle}>
-      <h2>Select Wallet</h2>
-      <p>Please choose which wallet to use:</p>
-      <button onClick={() => handleMobileWalletSelection("coinbase")} style={walletButtonStyle}>
-        Coinbase Wallet
-      </button>
-      <button onClick={() => handleMobileWalletSelection("metamask")} style={walletButtonStyle}>
-        MetaMask Wallet
-      </button>
-    </div>
-  );
-
-  // --- Render Desktop Wallet Install Prompt ---
+  // ------------------------------------------------------------------
+  // Render desktop wallet install prompt if no web3 wallet is detected.
+  // ------------------------------------------------------------------
   const renderDesktopWalletInstallPrompt = () => (
     <div style={walletInstallPromptStyle}>
       <p>No web3 wallet detected. Please install MetaMask or Coinbase Wallet extension.</p>
     </div>
   );
 
-  // --- Main Render ---
+  // ------------------------------------------------------------------
+  // Main render.
+  // ------------------------------------------------------------------
   return (
     <div
       style={{
@@ -688,26 +752,18 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         overflowX: "hidden"
       }}
     >
-      {/* Mobile wallet selection modal */}
+      {/* Mobile wallet selection modal: */}
       {isMobile && !currentAccount && (!window.ethereum || !(window.ethereum.isCoinbaseWallet || window.ethereum.isMetaMask)) && renderMobileWalletSelection()}
       {/* Desktop wallet install prompt */}
       {!isMobile && !window.ethereum && renderDesktopWalletInstallPrompt()}
-      
       {renderHeaderArea()}
-      
       <div style={{ width: "100%", maxWidth: "600px", padding: "1rem" }}>
-        {/* If no wallet is connected, display a connecting notice */}
-        {!currentAccount && (
-          <div style={{ textAlign: "center", margin: "1rem", padding: "1rem", border: "1px solid #ccc", borderRadius: "8px" }}>
-            Connecting wallet... Please wait.
-          </div>
-        )}
-        {/* Ephemeral Section: Only render if an ephemeral wallet (URL keys) exists and a wallet is connected */}
-        {ownerAddress && currentAccount && renderEphemeralSection()}
-        {/* Connected Wallet NFT Section */}
+        {/* Ephemeral Section */}
+        {ownerAddress && renderEphemeralSection()}
+        {/* Connected wallet NFT section */}
         {currentAccount && (
           <div style={{ marginBottom: "1rem", textAlign: "center" }}>
-            <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>Your Wallet NFTs</h2>
+            <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>Your Wallet NFT</h2>
             {myNfts.length > 0 ? (
               <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginTop: "1rem" }}>
                 {myNfts.map((n) => (
@@ -722,12 +778,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                 ))}
               </div>
             ) : (
-              <div style={{ padding: "1rem", border: "2px dashed #ccc", borderRadius: "8px" }}>
-                <p style={{ fontSize: "1rem", margin: 0 }}>No NFT found in your connected wallet.</p>
-                <p style={{ fontSize: "0.9rem", color: "#777", marginTop: "0.5rem" }}>
-                  Your minted NFTs will appear here.
-                </p>
-              </div>
+              <p style={{ fontSize: "1rem" }}>No NFT found in your connected wallet.</p>
             )}
           </div>
         )}
