@@ -33,7 +33,7 @@ const vaultABI = [
 ];
 
 const AdminPage = ({ currentAccount }) => {
-  // No forced network switching here—admin users rely on the header dropdown.
+  // State declarations
   const [depositAmount, setDepositAmount] = useState("100");
   const [depositRecipient, setDepositRecipient] = useState("");
   const [frontImageFile, setFrontImageFile] = useState(null);
@@ -391,7 +391,8 @@ const AdminPage = ({ currentAccount }) => {
       );
       const encryptedPrivateKey = encrypted.ciphertext.toString(CryptoJS.enc.Hex);
       const dappUrl = `${currentDomain}/?network=${currentNetworkName}&address=${wallet.address}&pk=${encryptedPrivateKey}`;
-      const link = `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(dappUrl)}`;
+      // Use normal URL without Coinbase deep link on admin CSV generation
+      const link = dappUrl;
       csvRows.push(`${wallet.address},${wallet.privateKey},${encryptedPrivateKey},${encryptionKey},${link}`);
       const qrOptions = {
         errorCorrectionLevel: 'H',
