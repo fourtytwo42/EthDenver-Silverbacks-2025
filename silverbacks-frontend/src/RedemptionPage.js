@@ -138,6 +138,27 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   };
 
   // ------------------------------------------------------------------
+  // Auto-connect: If no currentAccount is set, try to load it from MetaMask.
+  // ------------------------------------------------------------------
+  useEffect(() => {
+    if (!currentAccount && window.ethereum) {
+      window.ethereum
+        .request({ method: "eth_accounts" })
+        .then((accounts) => {
+          if (accounts && accounts.length > 0) {
+            setCurrentAccount(accounts[0]);
+            log("Auto-detected connected wallet: " + accounts[0]);
+          } else {
+            log("No connected wallet found.");
+          }
+        })
+        .catch((err) => {
+          log("Error fetching accounts: " + err.message);
+        });
+    }
+  }, [currentAccount, setCurrentAccount]);
+
+  // ------------------------------------------------------------------
   // getProvider: Returns a provider and attempts to switch/add network if needed.
   // ------------------------------------------------------------------
   const getProvider = async () => {
@@ -258,44 +279,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   useEffect(() => {
     loadContracts();
   }, [urlNetworkParam]);
-
-  // --- Automatically add stablecoin token if not already added ---
-  useEffect(() => {
-    if (window.ethereum && contractAddresses && contractAddresses.stableCoin) {
-      if (!localStorage.getItem("stablecoinAdded")) {
-        const tokenAddress = contractAddresses.stableCoin;
-        const tokenSymbol = "MSC";
-        const tokenDecimals = 18;
-        const tokenImage = "";
-        window.ethereum
-          .request({
-            method: "wallet_watchAsset",
-            params: {
-              type: "ERC20",
-              options: {
-                address: tokenAddress,
-                symbol: tokenSymbol,
-                decimals: tokenDecimals,
-                image: tokenImage,
-              },
-            },
-          })
-          .then((success) => {
-            if (success) {
-              log("Stablecoin token added to wallet");
-              localStorage.setItem("stablecoinAdded", "true");
-            } else {
-              log("Stablecoin token addition rejected");
-            }
-          })
-          .catch((error) => {
-            log("Error adding stablecoin token: " + error.message);
-          });
-      } else {
-        log("Stablecoin token already added, skipping.");
-      }
-    }
-  }, [contractAddresses]);
 
   // ------------------------------------------------------------------
   // Load ERC20 balance for connected wallet.
@@ -466,7 +449,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   }, [scanning]);
 
   // ------------------------------------------------------------------
-  // New: Auto-connect wallet if running inside a Coinbase or MetaMask in-app browser on mobile.
+  // Auto-connect for in-app wallets on mobile.
   // ------------------------------------------------------------------
   const connectWallet = async () => {
     if (!window.ethereum) {
@@ -719,8 +702,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   );
 
   // ------------------------------------------------------------------
-  // Mobile wallet selection prompt (only on mobile and when no wallet is connected)
-  // Updated to show only when no in-app wallet is detected.
+  // Render mobile wallet selection prompt.
   // ------------------------------------------------------------------
   const renderMobileWalletSelection = () => (
     <div style={walletSelectionModalStyle}>
@@ -761,8 +743,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         overflowX: "hidden"
       }}
     >
-      {/* Mobile wallet selection modal:
-          Only render if on mobile, no wallet connected, and if no in-app wallet is detected */}
+      {/* Mobile wallet selection modal: */}
       {isMobile && !currentAccount && (!window.ethereum || !(window.ethereum.isCoinbaseWallet || window.ethereum.isMetaMask)) && renderMobileWalletSelection()}
       {/* Desktop wallet install prompt */}
       {!isMobile && !window.ethereum && renderDesktopWalletInstallPrompt()}
