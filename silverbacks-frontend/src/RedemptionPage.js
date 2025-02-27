@@ -33,7 +33,8 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         color: "#fff",
         padding: "1rem",
         textAlign: "center",
-        fontSize: "1.2rem"
+        fontSize: "1.2rem",
+        width: "100%"
       }}
     >
       {urlNetworkParam ? urlNetworkParam.toUpperCase() : "NETWORK"}
@@ -117,12 +118,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                     chainId: targetChainId,
                     chainName: targetChainData.chainName,
                     rpcUrls: targetChainData.rpc ? [targetChainData.rpc] : [],
-                    blockExplorerUrls: targetChainData.explorer
-                      ? [targetChainData.explorer]
-                      : [],
+                    blockExplorerUrls: targetChainData.explorer ? [targetChainData.explorer] : [],
                     nativeCurrency:
-                      targetChainData.nativeCurrency ||
-                      { name: "ETH", symbol: "ETH", decimals: 18 }
+                      targetChainData.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 }
                   };
                   try {
                     await window.ethereum.request({
@@ -479,7 +477,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       const signer = provider.getSigner();
       const vaultContract = new ethers.Contract(contractAddresses.vault, vaultABI, signer);
       if (action === "redeem") {
-        // Redeem: burn the NFT and send $100 stablecoin to the NFT owner.
         msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Redeem:", tokenId]);
         const messageHashBytes = ethers.utils.arrayify(msg);
         signature = await ephemeralWallet.signMessage(messageHashBytes);
@@ -491,7 +488,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         loadRedeemNFTs();
         loadERC20Balance();
       } else if (action === "claim") {
-        // Claim: transfer the NFT from the ephemeral wallet to your connected wallet.
         msg = ethers.utils.solidityKeccak256(["string", "uint256"], ["Claim:", tokenId]);
         const messageHashBytes = ethers.utils.arrayify(msg);
         signature = await ephemeralWallet.signMessage(messageHashBytes);
@@ -563,7 +559,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
             <br />
             Claim: Transfers the NFT from the ephemeral wallet to your connected wallet.
           </p>
-          <div style={{ display: "flex", flexWrap: "wrap", marginTop: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginTop: "1rem" }}>
             {redeemNfts.map((n) => (
               <NFTCard
                 key={n.tokenId}
@@ -638,10 +634,22 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   // Main render.
   // ------------------------------------------------------------------
   return (
-    <div style={{ padding: 0, margin: 0, backgroundColor: "#f9f9f9", minHeight: "100vh" }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 0,
+        margin: 0,
+        backgroundColor: "#f9f9f9",
+        minHeight: "100vh",
+        overflowX: "hidden"
+      }}
+    >
       {missingNetworkInfo && renderMissingNetworkPrompt()}
       {renderNetworkBanner()}
-      <div style={{ padding: "1rem" }}>
+      <div style={{ width: "100%", maxWidth: "600px", padding: "1rem" }}>
         {/* Wallet Prompt Overlay */}
         {showWalletPrompt && (
           <div
@@ -689,15 +697,15 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
           </div>
         )}
 
-        {/* Ephemeral Section (dynamic based on NFT presence) */}
+        {/* Ephemeral Section */}
         {ownerAddress && renderEphemeralSection()}
 
         {/* Connected wallet NFT section */}
         {currentAccount && (
-          <div style={{ marginBottom: "1rem" }}>
-            <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>Your Wallet NFTs</h2>
+          <div style={{ marginBottom: "1rem", textAlign: "center" }}>
+            <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>Your Wallet NFT</h2>
             {myNfts.length > 0 ? (
-              <div style={{ display: "flex", flexWrap: "wrap", marginTop: "1rem" }}>
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", marginTop: "1rem" }}>
                 {myNfts.map((n) => (
                   <NFTCard
                     key={n.tokenId}
@@ -710,7 +718,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                 ))}
               </div>
             ) : (
-              <p style={{ fontSize: "1rem" }}>No NFTs found in your connected wallet.</p>
+              <p style={{ fontSize: "1rem" }}>No NFT found in your connected wallet.</p>
             )}
           </div>
         )}
@@ -720,9 +728,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
           <div
             style={{
               position: "fixed",
-              top: "20%",
+              top: "50%",
               left: "50%",
-              transform: "translateX(-50%)",
+              transform: "translate(-50%, -50%)",
               width: "320px",
               backgroundColor: "rgba(0,0,0,0.9)",
               padding: "1rem",
