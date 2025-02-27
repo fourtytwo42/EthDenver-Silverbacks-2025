@@ -87,6 +87,14 @@ const AdminPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, msg]);
   };
 
+  // NEW: Initialize Materialize select elements so they display correctly
+  useEffect(() => {
+    if (window.M) {
+      const elems = document.querySelectorAll("select");
+      window.M.FormSelect.init(elems);
+    }
+  }, []);
+
   // -------------------------------------
   // Load Contract Addresses from chains.json
   // -------------------------------------
@@ -729,6 +737,15 @@ const AdminPage = ({ currentAccount }) => {
         <p>WETH: {wethBalance}</p>
         <p>WLTC: {wltcBalance}</p>
       </div>
+      {/* Global NFT Type Dropdown */}
+      <div style={{ marginBottom: "20px" }}>
+        <label style={{ marginRight: "10px", fontWeight: "bold" }}>Select NFT Type:</label>
+        <select value={nftType} onChange={(e) => setNftType(e.target.value)}>
+          <option value="silverbacks">Silverbacks</option>
+          <option value="kinglouis">King Louis</option>
+        </select>
+      </div>
+      {/* Tab Navigation */}
       <div style={{ marginBottom: "20px" }}>
         <button onClick={() => setActiveTab("mintSelf")} style={activeTab === "mintSelf" ? activeTabButtonStyle : tabButtonStyle}>
           Mint Self
@@ -754,14 +771,6 @@ const AdminPage = ({ currentAccount }) => {
           <div>
             <div className="card">
               <div className="card-content">
-                {/* NFT Type dropdown */}
-                <div style={{ marginBottom: "10px" }}>
-                  <label style={{ marginRight: "10px", fontWeight: "bold" }}>NFT Type:</label>
-                  <select value={nftType} onChange={(e) => setNftType(e.target.value)}>
-                    <option value="silverbacks">Silverbacks</option>
-                    <option value="kinglouis">King Louis</option>
-                  </select>
-                </div>
                 {nftType === "kinglouis" ? (
                   <>
                     <span className="card-title">Mint King Louis (to Self)</span>
@@ -838,14 +847,6 @@ const AdminPage = ({ currentAccount }) => {
           <div>
             <div className="card">
               <div className="card-content">
-                {/* NFT Type dropdown */}
-                <div style={{ marginBottom: "10px" }}>
-                  <label style={{ marginRight: "10px", fontWeight: "bold" }}>NFT Type:</label>
-                  <select value={nftType} onChange={(e) => setNftType(e.target.value)}>
-                    <option value="silverbacks">Silverbacks</option>
-                    <option value="kinglouis">King Louis</option>
-                  </select>
-                </div>
                 {nftType === "kinglouis" ? (
                   <>
                     <span className="card-title">Mint King Louis to a Specific Address</span>
@@ -907,14 +908,6 @@ const AdminPage = ({ currentAccount }) => {
           <div>
             <div className="card">
               <div className="card-content">
-                {/* NFT Type dropdown */}
-                <div style={{ marginBottom: "10px" }}>
-                  <label style={{ marginRight: "10px", fontWeight: "bold" }}>NFT Type:</label>
-                  <select value={nftType} onChange={(e) => setNftType(e.target.value)}>
-                    <option value="silverbacks">Silverbacks</option>
-                    <option value="kinglouis">King Louis</option>
-                  </select>
-                </div>
                 {nftType === "kinglouis" ? (
                   <>
                     <span className="card-title">Batch Mint King Louis from CSV</span>
