@@ -105,6 +105,29 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   // State for stablecoin balance
   const [erc20Balance, setErc20Balance] = useState(null);
 
+  // New state for token prices for king louis
+  const [tokenPrices, setTokenPrices] = useState(null);
+
+  // Fetch token prices from Coingecko
+  useEffect(() => {
+    async function fetchTokenPrices() {
+      try {
+        const response = await fetch(
+          "https://api.coingecko.com/api/v3/simple/price?ids=wrapped-bitcoin,ethereum,litecoin&vs_currencies=usd"
+        );
+        const data = await response.json();
+        setTokenPrices({
+          wbtc: data["wrapped-bitcoin"] ? data["wrapped-bitcoin"].usd : 0,
+          weth: data["ethereum"] ? data["ethereum"].usd : 0,
+          wltc: data["litecoin"] ? data["litecoin"].usd : 0
+        });
+      } catch (error) {
+        console.error("Error fetching token prices:", error);
+      }
+    }
+    fetchTokenPrices();
+  }, []);
+
   // Header area: displays network and stablecoin balance.
   const renderHeaderArea = () => (
     <div
@@ -202,7 +225,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
             try {
               await window.ethereum.request({
                 method: "wallet_switchEthereumChain",
-                params: [{ chainId: targetChainId }],
+                params: [{ chainId: targetChainId }]
               });
               await new Promise((resolve) => setTimeout(resolve, 1000));
             } catch (switchError) {
@@ -223,11 +246,11 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                   try {
                     await window.ethereum.request({
                       method: "wallet_addEthereumChain",
-                      params: [addChainParams],
+                      params: [addChainParams]
                     });
                     await window.ethereum.request({
                       method: "wallet_switchEthereumChain",
-                      params: [{ chainId: targetChainId }],
+                      params: [{ chainId: targetChainId }]
                     });
                     await new Promise((resolve) => setTimeout(resolve, 1000));
                   } catch (addError) {
@@ -307,6 +330,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       const balance = await stableCoinContract.balanceOf(currentAccount);
       const formatted = ethers.utils.formatEther(balance);
       log(`Connected wallet ERC20 balance: ${formatted}`);
+      seterc20Balance(formatted);
       setErc20Balance(formatted);
     } catch (err) {
       log(`Error loading ERC20 balance: ${err.message}`);
@@ -486,7 +510,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       }
       setMyNFTs(nftData);
       if (nftData.length === 0) {
-        log(`No NFTs found in connected wallet ${currentAccount}`);
+        log(`No NFTs found in your connected wallet ${currentAccount}`);
       }
     } catch (err) {
       log(`Error loading connected wallet NFTs: ${err.message}`);
@@ -686,7 +710,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         <div style={{ marginBottom: "1rem", padding: "1rem", backgroundColor: "#eef7f5", borderRadius: "8px" }}>
           <h2 style={{ marginBottom: "0.5rem", textAlign: "center" }}>Bill Verified</h2>
           <p style={{ fontSize: "1rem", textAlign: "center" }}>
-            Redeem: Burns the NFT and credits your wallet with $100 in stablecoin.
+            {redeemNfts.some(n => n.type === "kinglouis")
+              ? "Redeem: Burns the NFT and credits your wallet with the ERC20 tokens contained in the note."
+              : "Redeem: Burns the NFT and credits your wallet with $100 in stablecoin."}
             <br />
             Claim: Transfers the NFT from the ephemeral wallet to your connected wallet.
           </p>
@@ -700,6 +726,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                 handleClaimNFT={() => initiateAction(n, "claim")}
                 handleRedeem={() => {}}
                 handleSendNFT={() => {}}
+                tokenPrices={tokenPrices}
               />
             ))}
           </div>
@@ -799,6 +826,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                   <NFTCard
                     key={n.tokenId + "-" + n.type}
                     nft={n}
+                    tokenPrices={tokenPrices}
                     handleRedeem={() => handleRedeemConnected(n)}
                     handleSendNFT={() => handleSendNFT(n)}
                     handleClaimNFT={() => {}}
@@ -833,9 +861,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
               width={300}
               height={300}
               stopStream={stopStream}
-              videoConstraints={
-                selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: "environment" }
-              }
+              videoConstraints={selectedDeviceId ? { deviceId: { exact: selectedDeviceId } } : { facingMode: "environment" }}
               onUpdate={handleScan}
             />
             <button
