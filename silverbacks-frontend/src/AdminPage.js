@@ -34,13 +34,17 @@ const vaultABI = [
   "function claimNFT(uint256, bytes) external"
 ];
 
-// Helper: if we are on Somnia testnet (chain ID 0xc488) force legacy transactions.
+/**
+ * Helper: Force legacy transactions on Somnia testnet.
+ * If the current chain is Somnia (chain ID 0xc488), return overrides with:
+ *   type: 0 and an explicit gasPrice (here set to 10 gwei, adjust as needed).
+ * Otherwise, return an empty object.
+ */
 const getTxOverrides = async () => {
   const provider = new ethers.providers.Web3Provider(window.ethereum);
   const network = await provider.getNetwork();
   const chainIdHex = "0x" + network.chainId.toString(16);
   if (chainIdHex.toLowerCase() === "0xc488") {
-    // Adjust gasPrice as needed.
     return { type: 0, gasPrice: ethers.utils.parseUnits("10", "gwei") };
   } else {
     return {};
@@ -100,7 +104,7 @@ const AdminPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // NEW: Initialize Materialize select elements so they display correctly
+  // Initialize Materialize select elements so they display correctly
   useEffect(() => {
     if (window.M) {
       const elems = document.querySelectorAll("select");
@@ -486,7 +490,7 @@ const AdminPage = ({ currentAccount }) => {
       log("Approving vault to spend 3 WLTC...");
       await tx.wait();
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      // Pass 0 as the dummy deposit amount for King Louis
+      // For King Louis deposits, pass 0 as the dummy deposit amount.
       tx = await vaultContract.deposit(0, metaURI, await getTxOverrides());
       log("Depositing tokens and minting King Louis NFT...");
       await tx.wait();
@@ -497,6 +501,7 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
+  // For minting King Louis NFT to a recipient, detect Somnia testnet and use deposit() if necessary.
   const handleDepositToKingLouis = async () => {
     if (!depositRecipient || !ethers.utils.isAddress(depositRecipient)) {
       alert("Please enter a valid recipient address.");
@@ -528,8 +533,16 @@ const AdminPage = ({ currentAccount }) => {
       log("Approving vault to spend 3 WLTC...");
       await tx.wait();
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      tx = await vaultContract.depositTo(depositRecipient, 0, metaURI, await getTxOverrides());
-      log("Depositing tokens and minting King Louis NFT to " + depositRecipient + "...");
+      const network = await provider.getNetwork();
+      const chainIdHex = "0x" + network.chainId.toString(16);
+      if (chainIdHex.toLowerCase() === "0xc488") {
+        // On Somnia testnet, depositTo is not supported; fallback to deposit() (NFT minted to self).
+        tx = await vaultContract.deposit(0, metaURI, await getTxOverrides());
+        log("Depositing tokens and minting King Louis NFT to self (Somnia testnet workaround)...");
+      } else {
+        tx = await vaultContract.depositTo(depositRecipient, 0, metaURI, await getTxOverrides());
+        log("Depositing tokens and minting King Louis NFT to " + depositRecipient + "...");
+      }
       await tx.wait();
       log("DepositTo transaction confirmed!");
       loadData();
@@ -628,7 +641,7 @@ const AdminPage = ({ currentAccount }) => {
       }
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
       log(`Redeeming NFT tokenId ${tokenId} from ${type} vault...`);
-      const tx = await vaultContract.redeem(tokenId, { ...(await getTxOverrides()), gasLimit: 10000000 });
+      const tx = await vaultContract.redeem(tokenId, { gasLimit: 10000000, ...(await getTxOverrides()) });
       await tx.wait();
       log(`Redeem confirmed for tokenId ${tokenId}`);
       loadData();

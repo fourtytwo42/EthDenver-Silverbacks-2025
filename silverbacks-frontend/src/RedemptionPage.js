@@ -1,3 +1,4 @@
+// src/RedemptionPage.js
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
@@ -172,7 +173,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   // Other state variables.
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNFTs] = useState([]);
-  const [myNfts, setMyNfts] = useState([]);
+  const [myNfts, setMyNFTs] = useState([]);
   const [logMessages, setLogMessages] = useState([]);
   const [contractAddresses, setContractAddresses] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -709,9 +710,20 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // Render the ephemeral section.
+  // Updated: Render the ephemeral section.
+  // If no redeemable NFTs are found for the URL address, display a message stating that the bill is not valid or has been redeemed.
   const renderEphemeralSection = () => {
     if (!ownerAddress) return null;
+    if (redeemNfts.length === 0) {
+      return (
+        <div style={{ marginBottom: "1rem", padding: "1rem", backgroundColor: "#eef7f5", borderRadius: "8px", textAlign: "center" }}>
+          <h2 style={{ marginBottom: "0.5rem" }}>Invalid or Redeemed Bill</h2>
+          <p style={{ fontSize: "1rem" }}>
+            The bill is not valid or has already been redeemed.
+          </p>
+        </div>
+      );
+    }
     return (
       <div style={{ marginBottom: "1rem", padding: "1rem", backgroundColor: "#eef7f5", borderRadius: "8px" }}>
         <h2 style={{ marginBottom: "0.5rem", textAlign: "center" }}>Bill Verified</h2>
