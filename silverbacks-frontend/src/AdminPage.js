@@ -34,23 +34,6 @@ const vaultABI = [
   "function claimNFT(uint256, bytes) external"
 ];
 
-/**
- * Helper: Force legacy transactions on Somnia testnet.
- * If the current chain is Somnia (chain ID 0xc488), return overrides with:
- *   type: 0 and an explicit gasPrice (here set to 10 gwei, adjust as needed).
- * Otherwise, return an empty object.
- */
-const getTxOverrides = async () => {
-  const provider = new ethers.providers.Web3Provider(window.ethereum);
-  const network = await provider.getNetwork();
-  const chainIdHex = "0x" + network.chainId.toString(16);
-  if (chainIdHex.toLowerCase() === "0xc488") {
-    return { type: 0, gasPrice: ethers.utils.parseUnits("10", "gwei") };
-  } else {
-    return {};
-  }
-};
-
 const AdminPage = ({ currentAccount }) => {
   // State declarations
   const [depositAmount, setDepositAmount] = useState("100");
@@ -104,7 +87,7 @@ const AdminPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // Initialize Materialize select elements so they display correctly
+  // NEW: Initialize Materialize select elements so they display correctly
   useEffect(() => {
     if (window.M) {
       const elems = document.querySelectorAll("select");
@@ -358,12 +341,12 @@ const AdminPage = ({ currentAccount }) => {
         alert("Vault address not found for selected NFT type.");
         return;
       }
-      let tx = await stableCoinContract.approve(vaultAddress, depositWei, await getTxOverrides());
+      let tx = await stableCoinContract.approve(vaultAddress, depositWei);
       log("Approving vault to spend " + rawAmount + " tokens...");
       await tx.wait();
       log("Approval confirmed.");
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      tx = await vaultContract.deposit(depositWei, metaURI, await getTxOverrides());
+      tx = await vaultContract.deposit(depositWei, metaURI);
       log("Depositing stablecoins and minting Silverback NFT(s)...");
       await tx.wait();
       log("Deposit transaction confirmed!");
@@ -388,12 +371,12 @@ const AdminPage = ({ currentAccount }) => {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
-      let approveTx = await stableCoinContract.approve(getVaultAddress(), depositWei, await getTxOverrides());
+      let approveTx = await stableCoinContract.approve(getVaultAddress(), depositWei);
       log("Approving vault to spend 100 tokens...");
       await approveTx.wait();
       log("Approval confirmed.");
       const vaultContract = new ethers.Contract(getVaultAddress(), vaultABI, signer);
-      let tx = await vaultContract.depositTo(depositRecipient, depositWei, metaURI, await getTxOverrides());
+      let tx = await vaultContract.depositTo(depositRecipient, depositWei, metaURI);
       log("Depositing stablecoins and minting Silverback NFT to " + depositRecipient + "...");
       await tx.wait();
       log("DepositTo transaction confirmed!");
@@ -444,12 +427,12 @@ const AdminPage = ({ currentAccount }) => {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
-      let tx = await stableCoinContract.approve(getVaultAddress(), totalDeposit, await getTxOverrides());
+      let tx = await stableCoinContract.approve(getVaultAddress(), totalDeposit);
       log("Approving vault for batch deposit of " + (recipients.length * 100) + " tokens...");
       await tx.wait();
       log("Approval confirmed.");
       const vaultContract = new ethers.Contract(getVaultAddress(), vaultABI, signer);
-      tx = await vaultContract.batchDeposit(recipients, metadataURIs, await getTxOverrides());
+      tx = await vaultContract.batchDeposit(recipients, metadataURIs);
       log("Batch deposit transaction submitted for Silverback NFTs...");
       await tx.wait();
       log("Batch deposit transaction confirmed!");
@@ -480,18 +463,18 @@ const AdminPage = ({ currentAccount }) => {
       const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
       const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
       const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
-      let tx = await wbtcContract.approve(vaultAddress, REQUIRED_WBTC, await getTxOverrides());
+      let tx = await wbtcContract.approve(vaultAddress, REQUIRED_WBTC);
       log("Approving vault to spend 0.05 WBTC...");
       await tx.wait();
-      tx = await wethContract.approve(vaultAddress, REQUIRED_WETH, await getTxOverrides());
+      tx = await wethContract.approve(vaultAddress, REQUIRED_WETH);
       log("Approving vault to spend 0.5 WETH...");
       await tx.wait();
-      tx = await wltcContract.approve(vaultAddress, REQUIRED_WLTC, await getTxOverrides());
+      tx = await wltcContract.approve(vaultAddress, REQUIRED_WLTC);
       log("Approving vault to spend 3 WLTC...");
       await tx.wait();
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      // For King Louis deposits, pass 0 as the dummy deposit amount.
-      tx = await vaultContract.deposit(0, metaURI, await getTxOverrides());
+      // Pass 0 as the dummy deposit amount for King Louis
+      tx = await vaultContract.deposit(0, metaURI);
       log("Depositing tokens and minting King Louis NFT...");
       await tx.wait();
       log("Deposit transaction confirmed!");
@@ -501,7 +484,6 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // For minting King Louis NFT to a recipient, detect Somnia testnet and use deposit() if necessary.
   const handleDepositToKingLouis = async () => {
     if (!depositRecipient || !ethers.utils.isAddress(depositRecipient)) {
       alert("Please enter a valid recipient address.");
@@ -523,26 +505,19 @@ const AdminPage = ({ currentAccount }) => {
       const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
       const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
       const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
-      let tx = await wbtcContract.approve(vaultAddress, REQUIRED_WBTC, await getTxOverrides());
+      let tx = await wbtcContract.approve(vaultAddress, REQUIRED_WBTC);
       log("Approving vault to spend 0.05 WBTC...");
       await tx.wait();
-      tx = await wethContract.approve(vaultAddress, REQUIRED_WETH, await getTxOverrides());
+      tx = await wethContract.approve(vaultAddress, REQUIRED_WETH);
       log("Approving vault to spend 0.5 WETH...");
       await tx.wait();
-      tx = await wltcContract.approve(vaultAddress, REQUIRED_WLTC, await getTxOverrides());
+      tx = await wltcContract.approve(vaultAddress, REQUIRED_WLTC);
       log("Approving vault to spend 3 WLTC...");
       await tx.wait();
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      const network = await provider.getNetwork();
-      const chainIdHex = "0x" + network.chainId.toString(16);
-      if (chainIdHex.toLowerCase() === "0xc488") {
-        // On Somnia testnet, depositTo is not supported; fallback to deposit() (NFT minted to self).
-        tx = await vaultContract.deposit(0, metaURI, await getTxOverrides());
-        log("Depositing tokens and minting King Louis NFT to self (Somnia testnet workaround)...");
-      } else {
-        tx = await vaultContract.depositTo(depositRecipient, 0, metaURI, await getTxOverrides());
-        log("Depositing tokens and minting King Louis NFT to " + depositRecipient + "...");
-      }
+      // Pass 0 as the dummy deposit amount for King Louis
+      tx = await vaultContract.depositTo(depositRecipient, 0, metaURI);
+      log("Depositing tokens and minting King Louis NFT to " + depositRecipient + "...");
       await tx.wait();
       log("DepositTo transaction confirmed!");
       loadData();
@@ -602,17 +577,17 @@ const AdminPage = ({ currentAccount }) => {
       const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
       const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
       const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
-      let tx = await wbtcContract.approve(vaultAddress, totalWbtc, await getTxOverrides());
+      let tx = await wbtcContract.approve(vaultAddress, totalWbtc);
       log("Approving vault to spend total " + ethers.utils.formatUnits(totalWbtc, 18) + " WBTC...");
       await tx.wait();
-      tx = await wethContract.approve(vaultAddress, totalWeth, await getTxOverrides());
+      tx = await wethContract.approve(vaultAddress, totalWeth);
       log("Approving vault to spend total " + ethers.utils.formatUnits(totalWeth, 18) + " WETH...");
       await tx.wait();
-      tx = await wltcContract.approve(vaultAddress, totalWltc, await getTxOverrides());
+      tx = await wltcContract.approve(vaultAddress, totalWltc);
       log("Approving vault to spend total " + ethers.utils.formatUnits(totalWltc, 18) + " WLTC...");
       await tx.wait();
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      tx = await vaultContract.batchDeposit(recipients, metadataURIs, await getTxOverrides());
+      tx = await vaultContract.batchDeposit(recipients, metadataURIs);
       log("Batch deposit transaction submitted for King Louis NFTs...");
       await tx.wait();
       log("Batch deposit transaction confirmed!");
@@ -641,7 +616,7 @@ const AdminPage = ({ currentAccount }) => {
       }
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
       log(`Redeeming NFT tokenId ${tokenId} from ${type} vault...`);
-      const tx = await vaultContract.redeem(tokenId, { gasLimit: 10000000, ...(await getTxOverrides()) });
+      const tx = await vaultContract.redeem(tokenId);
       await tx.wait();
       log(`Redeem confirmed for tokenId ${tokenId}`);
       loadData();
