@@ -1,3 +1,4 @@
+// src/NFTCard.js
 import React, { useState } from "react";
 import { ethers } from "ethers";
 
@@ -12,9 +13,7 @@ const NFTCard = ({
   // State to control which image is shown: true = front, false = back
   const [showFront, setShowFront] = useState(true);
 
-  const toggleImage = () => {
-    setShowFront((prev) => !prev);
-  };
+  const toggleImage = () => setShowFront((prev) => !prev);
 
   // Use the front image if available; if back image is missing, fall back to front.
   const frontImage = nft.image;
@@ -22,12 +21,15 @@ const NFTCard = ({
   const displayedImage = showFront ? frontImage : backImage;
   const altText = showFront ? "NFT Front" : "NFT Back";
 
+  // For King Louis NFTs, change the redeem button text.
+  const redeemButtonText =
+    nft.type === "kinglouis" ? "Redeem Tokens" : "Redeem Stablecoin";
+
   return (
     <div className="col s12 m6 l4">
       <div className="card">
         <div className="card-image" style={{ position: "relative" }}>
           {displayedImage ? (
-            // Adding a key based on showFront forces the <img> to re-render when toggled.
             <img
               key={showFront ? "front" : "back"}
               src={displayedImage.replace(
@@ -38,8 +40,8 @@ const NFTCard = ({
               style={{
                 height: "200px",
                 width: "100%",
-                objectFit: "contain", // ensure full image is visible
-                backgroundColor: "#000", // optional background for letterboxing
+                objectFit: "contain",
+                backgroundColor: "transparent",
               }}
             />
           ) : (
@@ -82,19 +84,31 @@ const NFTCard = ({
         >
           {pk && ethers.utils.isHexString(pk, 32) ? (
             <>
-              <button onClick={() => handleRedeemTo(nft.tokenId)} className="btn green">
-                Redeem Stablecoin
+              <button
+                onClick={() => handleRedeemTo(nft.tokenId)}
+                className="btn green"
+              >
+                {redeemButtonText}
               </button>
-              <button onClick={() => handleClaimNFT(nft.tokenId)} className="btn blue">
+              <button
+                onClick={() => handleClaimNFT(nft.tokenId)}
+                className="btn blue"
+              >
                 Claim NFT
               </button>
             </>
           ) : (
             <>
-              <button onClick={() => handleRedeem(nft.tokenId)} className="btn green">
+              <button
+                onClick={() => handleRedeem(nft.tokenId)}
+                className="btn green"
+              >
                 Redeem NFT
               </button>
-              <button onClick={() => handleSendNFT(nft.tokenId)} className="btn blue">
+              <button
+                onClick={() => handleSendNFT(nft.tokenId)}
+                className="btn blue"
+              >
                 Send NFT
               </button>
             </>

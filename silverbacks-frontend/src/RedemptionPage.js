@@ -1,3 +1,4 @@
+// src/RedemptionPage.js
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
@@ -30,7 +31,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   // Detect mobile browser
   const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 
-  // New: Wallet selection for mobile devices when no wallet is connected.
+  // Wallet selection for mobile devices when no wallet is connected.
   const handleMobileWalletSelection = (walletType) => {
     const currentUrl = window.location.href;
     if (walletType === "coinbase") {
@@ -72,7 +73,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     margin: "0.5rem"
   };
 
-  // Disabled style for MetaMask wallet button
   const disabledWalletButtonStyle = {
     ...walletButtonStyle,
     backgroundColor: "#9e9e9e",
@@ -88,7 +88,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     marginBottom: "1rem"
   };
 
-  // Render mobile wallet selection prompt.
   const renderMobileWalletSelection = () => (
     <div style={walletSelectionModalStyle}>
       <h2>Select Wallet</h2>
@@ -105,7 +104,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   // State for stablecoin balance
   const [erc20Balance, setErc20Balance] = useState(null);
 
-  // New state for token prices for king louis
+  // New state: current token prices for King Louis (in USD)
   const [tokenPrices, setTokenPrices] = useState(null);
 
   // Fetch token prices from Coingecko
@@ -128,7 +127,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     fetchTokenPrices();
   }, []);
 
-  // Header area: displays network and stablecoin balance.
+  // Header area
   const renderHeaderArea = () => (
     <div
       style={{
@@ -161,7 +160,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       })()
     : "";
 
-  // State variables.
+  // Other state variables.
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNFTs] = useState([]);
   const [myNfts, setMyNFTs] = useState([]);
@@ -185,7 +184,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     setLogMessages((prev) => [...prev, `[${timestamp}] ${msg}`]);
   };
 
-  // Auto-connect: If no currentAccount is set, try to load it from MetaMask.
+  // Auto-connect wallet.
   useEffect(() => {
     if (!currentAccount && window.ethereum) {
       window.ethereum
@@ -204,7 +203,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [currentAccount, setCurrentAccount]);
 
-  // getProvider: Returns a provider and attempts to switch/add network if needed.
+  // getProvider: Returns a provider and attempts network switching.
   const getProvider = async () => {
     if (window.ethereum) {
       log("Using MetaMask provider");
@@ -219,20 +218,21 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
           const network = await provider.getNetwork();
           const currentChainIdHex = "0x" + network.chainId.toString(16);
           if (currentChainIdHex.toLowerCase() !== targetChainId.toLowerCase()) {
-            log(
-              `Current chain (${currentChainIdHex}) does not match target (${targetChainId}). Attempting to switch...`
-            );
+            log(`Current chain (${currentChainIdHex}) does not match target (${targetChainId}). Attempting to switch...`);
             try {
               await window.ethereum.request({
                 method: "wallet_switchEthereumChain",
                 params: [{ chainId: targetChainId }]
               });
               await new Promise((resolve) => setTimeout(resolve, 1000));
+              // Reinitialize provider after switching network
+              const newProvider = new ethers.providers.Web3Provider(window.ethereum);
+              const newNetwork = await newProvider.getNetwork();
+              log(`Switched to network with chainId: 0x${newNetwork.chainId.toString(16)}`);
+              return newProvider;
             } catch (switchError) {
               if (switchError.code === 4902) {
-                log(
-                  `Network ${targetChainId} is not added to your wallet. Attempting to add it...`
-                );
+                log(`Network ${targetChainId} is not added to your wallet. Attempting to add it...`);
                 const targetChainData = chains[targetChainId];
                 if (targetChainData) {
                   const addChainParams = {
@@ -240,8 +240,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                     chainName: targetChainData.chainName,
                     rpcUrls: targetChainData.rpc ? [targetChainData.rpc] : [],
                     blockExplorerUrls: targetChainData.explorer ? [targetChainData.explorer] : [],
-                    nativeCurrency:
-                      targetChainData.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 }
+                    nativeCurrency: targetChainData.nativeCurrency || { name: "ETH", symbol: "ETH", decimals: 18 }
                   };
                   try {
                     await window.ethereum.request({
@@ -253,6 +252,10 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                       params: [{ chainId: targetChainId }]
                     });
                     await new Promise((resolve) => setTimeout(resolve, 1000));
+                    const newProvider = new ethers.providers.Web3Provider(window.ethereum);
+                    const newNetwork = await newProvider.getNetwork();
+                    log(`Switched to network with chainId: 0x${newNetwork.chainId.toString(16)}`);
+                    return newProvider;
                   } catch (addError) {
                     log("Error adding network: " + addError.message);
                     throw new Error("Error adding network: " + addError.message);
@@ -263,13 +266,9 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                 }
               } else if (
                 switchError.message &&
-                switchError.message.includes(
-                  "The request has been rejected due to a change in selected network"
-                )
+                switchError.message.includes("The request has been rejected due to a change in selected network")
               ) {
-                log(
-                  "Network switch request rejected due to a change in selected network. Please manually switch to the target network."
-                );
+                log("Network switch request rejected due to a change in selected network. Please manually switch to the target network.");
               } else {
                 log("Error switching network: " + switchError.message);
                 throw new Error("Error switching network: " + switchError.message);
@@ -330,7 +329,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       const balance = await stableCoinContract.balanceOf(currentAccount);
       const formatted = ethers.utils.formatEther(balance);
       log(`Connected wallet ERC20 balance: ${formatted}`);
-      seterc20Balance(formatted);
       setErc20Balance(formatted);
     } catch (err) {
       log(`Error loading ERC20 balance: ${err.message}`);
@@ -579,7 +577,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   }, [isMobile, currentAccount]);
 
-  // Initiate action via QR scanner. Now we store the entire NFT object.
+  // Initiate action via QR scanner.
   const initiateAction = (nft, action) => {
     setPendingNFT(nft);
     setPendingAction(action);
@@ -702,24 +700,23 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     }
   };
 
-  // Render the ephemeral section based on whether an NFT is present.
+  // Render the ephemeral section.
   const renderEphemeralSection = () => {
     if (!ownerAddress) return null;
-    if (redeemNfts.length > 0) {
-      return (
-        <div style={{ marginBottom: "1rem", padding: "1rem", backgroundColor: "#eef7f5", borderRadius: "8px" }}>
-          <h2 style={{ marginBottom: "0.5rem", textAlign: "center" }}>Bill Verified</h2>
-          <p style={{ fontSize: "1rem", textAlign: "center" }}>
-            {redeemNfts.some(n => n.type === "kinglouis")
-              ? "Redeem: Burns the NFT and credits your wallet with the ERC20 tokens contained in the note."
-              : "Redeem: Burns the NFT and credits your wallet with $100 in stablecoin."}
-            <br />
-            Claim: Transfers the NFT from the ephemeral wallet to your connected wallet.
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", marginTop: "1rem" }}>
-            {redeemNfts.map((n) => (
+    return (
+      <div style={{ marginBottom: "1rem", padding: "1rem", backgroundColor: "#eef7f5", borderRadius: "8px" }}>
+        <h2 style={{ marginBottom: "0.5rem", textAlign: "center" }}>Bill Verified</h2>
+        <p style={{ fontSize: "1rem", textAlign: "center" }}>
+          {redeemNfts.some(n => n.type === "kinglouis")
+            ? "Redeem: Burns the NFT and credits your wallet with the ERC20 tokens held by the note."
+            : "Redeem: Burns the NFT and credits your wallet with $100 in stablecoin."}
+          <br />
+          Claim: Transfers the NFT from the paper note to your connected wallet.
+        </p>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", marginTop: "1rem" }}>
+          {redeemNfts.map((n) => (
+            <div key={n.tokenId + "-" + n.type} style={{ margin: "10px" }}>
               <NFTCard
-                key={n.tokenId + "-" + n.type}
                 nft={n}
                 pk={ephemeralDisplayPk}
                 handleRedeemTo={() => initiateAction(n, "redeem")}
@@ -728,65 +725,59 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
                 handleSendNFT={() => {}}
                 tokenPrices={tokenPrices}
               />
-            ))}
-          </div>
+              {n.type === "kinglouis" && tokenPrices && (
+                <div style={{ backgroundColor: "#f0f0f0", padding: "5px", marginTop: "5px", borderRadius: "4px", textAlign: "center" }}>
+                  <p style={{ margin: 0, fontSize: "0.9rem" }}>
+                    0.05 WBTC: ${ (0.05 * tokenPrices.wbtc).toFixed(2) } <br/>
+                    0.5 WETH: ${ (0.5 * tokenPrices.weth).toFixed(2) } <br/>
+                    3 WLTC: ${ (3 * tokenPrices.wltc).toFixed(2) } <br/>
+                    <strong>Total: ${ ((0.05 * tokenPrices.wbtc) + (0.5 * tokenPrices.weth) + (3 * tokenPrices.wltc)).toFixed(2) }</strong>
+                  </p>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-      );
-    } else {
-      return (
-        <div style={{ marginBottom: "1rem", padding: "1rem", backgroundColor: "#fce4e4", borderRadius: "8px", textAlign: "center" }}>
-          <h2 style={{ marginBottom: "0.5rem" }}>Bill has been redeemed or is Invalid</h2>
-        </div>
-      );
-    }
+      </div>
+    );
   };
 
-  // Render missing network prompt if needed.
-  const renderMissingNetworkPrompt = () => (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        width: "100%",
-        height: "100%",
-        backgroundColor: "rgba(255,255,255,0.95)",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 3000,
-        textAlign: "center",
-        padding: "1rem"
-      }}
-    >
-      <h2 style={{ marginBottom: "1rem" }}>Network Not Added</h2>
-      <p style={{ marginBottom: "1rem", padding: "0 1rem" }}>
-        Your wallet does not have the {missingNetworkInfo.network} network added.
-        Please visit{" "}
-        <a href={missingNetworkInfo.link} target="_blank" rel="noopener noreferrer">
-          {missingNetworkInfo.link}
-        </a>{" "}
-        to add it to your wallet, then click "Refresh".
-      </p>
-      <button
-        style={{
-          padding: "1rem 2rem",
-          fontSize: "1.2rem",
-          backgroundColor: "#1976d2",
-          color: "#fff",
-          border: "none",
-          borderRadius: "8px",
-          cursor: "pointer"
-        }}
-        onClick={() => window.location.reload()}
-      >
-        Refresh
-      </button>
+  // Render connected wallet NFTs section.
+  const renderWalletNFTSection = () => (
+    <div style={{ marginBottom: "1rem", textAlign: "center" }}>
+      <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>Your Wallet NFT</h2>
+      {myNfts.length > 0 ? (
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", marginTop: "1rem" }}>
+          {myNfts.map((n) => (
+            <div key={n.tokenId + "-" + n.type} style={{ margin: "10px" }}>
+              <NFTCard
+                nft={n}
+                tokenPrices={tokenPrices}
+                handleRedeem={() => handleRedeemConnected(n)}
+                handleSendNFT={() => handleSendNFT(n)}
+                handleClaimNFT={() => {}}
+                handleRedeemTo={() => {}}
+              />
+              {n.type === "kinglouis" && tokenPrices && (
+                <div style={{ backgroundColor: "#f0f0f0", padding: "5px", marginTop: "5px", borderRadius: "4px", textAlign: "center" }}>
+                  <p style={{ margin: 0, fontSize: "0.9rem" }}>
+                    0.05 WBTC: ${ (0.05 * tokenPrices.wbtc).toFixed(2) } <br/>
+                    0.5 WETH: ${ (0.5 * tokenPrices.weth).toFixed(2) } <br/>
+                    3 WLTC: ${ (3 * tokenPrices.wltc).toFixed(2) } <br/>
+                    <strong>Total: ${ ((0.05 * tokenPrices.wbtc) + (0.5 * tokenPrices.weth) + (3 * tokenPrices.wltc)).toFixed(2) }</strong>
+                  </p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p style={{ fontSize: "1rem" }}>No NFT found in your connected wallet.</p>
+      )}
     </div>
   );
 
-  // Render desktop wallet install prompt if no web3 wallet is detected.
+  // Render desktop wallet install prompt.
   const renderDesktopWalletInstallPrompt = () => (
     <div style={walletInstallPromptStyle}>
       <p>No web3 wallet detected. Please install MetaMask or Coinbase Wallet extension.</p>
@@ -808,38 +799,12 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         overflowX: "hidden"
       }}
     >
-      {/* Mobile wallet selection modal: */}
       {isMobile && !currentAccount && (!window.ethereum || !(window.ethereum.isCoinbaseWallet || window.ethereum.isMetaMask)) && renderMobileWalletSelection()}
-      {/* Desktop wallet install prompt */}
       {!isMobile && !window.ethereum && renderDesktopWalletInstallPrompt()}
       {renderHeaderArea()}
       <div style={{ width: "100%", maxWidth: "600px", padding: "1rem" }}>
-        {/* Ephemeral Section */}
         {ownerAddress && renderEphemeralSection()}
-        {/* Connected wallet NFT section */}
-        {currentAccount && (
-          <div style={{ marginBottom: "1rem", textAlign: "center" }}>
-            <h2 style={{ fontSize: "1.2rem", marginBottom: "0.5rem" }}>Your Wallet NFT</h2>
-            {myNfts.length > 0 ? (
-              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", marginTop: "1rem" }}>
-                {myNfts.map((n) => (
-                  <NFTCard
-                    key={n.tokenId + "-" + n.type}
-                    nft={n}
-                    tokenPrices={tokenPrices}
-                    handleRedeem={() => handleRedeemConnected(n)}
-                    handleSendNFT={() => handleSendNFT(n)}
-                    handleClaimNFT={() => {}}
-                    handleRedeemTo={() => {}}
-                  />
-                ))}
-              </div>
-            ) : (
-              <p style={{ fontSize: "1rem" }}>No NFT found in your connected wallet.</p>
-            )}
-          </div>
-        )}
-        {/* QR Code Scanner Modal */}
+        {currentAccount && renderWalletNFTSection()}
         {scanning && (
           <div
             style={{
@@ -884,7 +849,6 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
             </button>
           </div>
         )}
-        {/* Debug Log */}
         <div
           style={{
             marginTop: "2rem",
