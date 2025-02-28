@@ -6,33 +6,24 @@
     "deploy:silverbacks:linea": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network linea",
     "deploy:silverbacks:flowtestnet": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network flowtestnet",
     "deploy:silverbacks:u2u": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network u2u",
-    "deploy:silverbacks:unichain-sepolia": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network unichain_sepolia",
-    "deploy:silverbacks:zircuit-testnet": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network zircuit_testnet",
-    "deploy:silverbacks:zksync-sepolia": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network zksync_sepolia",
+    "deploy:silverbacks:storyaeneid": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network storyaeneid",
     "deploy:multitoken:sepolia": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network sepolia",
     "deploy:multitoken:linea": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network linea",
     "deploy:multitoken:flowtestnet": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network flowtestnet",
     "deploy:multitoken:u2u": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network u2u",
-    "deploy:multitoken:unichain-sepolia": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network unichain_sepolia",
-    "deploy:multitoken:zircuit-testnet": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network zircuit_testnet",
-    "deploy:multitoken:zksync-sepolia": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network zksync_sepolia",
+    "deploy:multitoken:storyaeneid": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network storyaeneid",
     "test": "npx hardhat test"
   },
   "dependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.2.2",
     "@openzeppelin/contracts": "^4.8.3",
     "dotenv": "^16.0.3",
+    "ethers": "^5.7.2",
     "hardhat": "^2.12.7"
   },
   "devDependencies": {
-    "@matterlabs/hardhat-zksync": "^1.4.0",
-    "@matterlabs/hardhat-zksync-deploy": "^1.6.0",
-    "@matterlabs/hardhat-zksync-solc": "^1.2.5",
-    "@matterlabs/hardhat-zksync-ethers": "^1.2.1",
     "chai": "^4.3.7",
-    "cross-env": "^7.0.3",
-    "ethers": "^6.13.5",
     "mocha": "^10.2.0",
-    "zksync-ethers": "^6.11.2",
-    "zksync-web3": "^0.7.13"
+    "cross-env": "^7.0.3"
   }
 }
