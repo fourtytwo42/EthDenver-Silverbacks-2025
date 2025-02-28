@@ -37,7 +37,64 @@
       "weth": "0xF53C6310e64C49D241D35295192e3828b19bBBe4",
       "wltc": "0x4a11391593D221b69067D85261fAe56443D89B95",
       "multiTokenNFT": "0x89F197339d351B231FC883563f328bE19bbc0e86",
-      "multiTokenVault": "0x08950cc3399B83839AE3EF56E2E865Eb3AcB7728"
+      "multiTokenVault": "0x08950cc3399B83839AE3EF56E2E865Eb3AcB7728",
+      "kingLouis": {
+        "wbtc": "0x192D97D93255c296b68D89FDE9583A62F70B7d89",
+        "weth": "0xdaAf38B075739389ccdec33461EC8A787E9f3153",
+        "wltc": "0x8A007765a8fbF720149F63011a48Be6e491FCa6F",
+        "multiTokenNFT": "0xd6E63f6033460F8Ae05c7a2a6446AfF356ae1d22",
+        "multiTokenVault": "0x28Fb7CE0014040d39bb670652732db4625CcCE88"
+      }
+    }
+  },
+  "0x221": {
+    "chainId": 545,
+    "chainName": "unknown",
+    "rpc": "",
+    "explorer": "",
+    "nativeCurrency": {
+      "name": "ETH",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "contracts": {
+      "kingLouis": {
+        "wbtc": "0x0C3a2419E2885B52B6E468cE24A0101160dF2215",
+        "weth": "0xcfB147dadF551265872B70aF26B99A3560bd0Bc0",
+        "wltc": "0xf89155d3aBD782B41B9C6804d76f7ea61032A676",
+        "multiTokenNFT": "0xe29324a6753b39Ed8f580c8A2578473F84e781ab",
+        "multiTokenVault": "0x6201151b947EaE45E3453f64cE56Eea4A3B064a8"
+      },
+      "silverbacks": {
+        "stableCoin": "0x92557Be585DA9256D0c472E6768C9fCf1621F236",
+        "silverbacksNFT": "0x54E8B98673ED89301A7307daCa930671a8d83210",
+        "vault": "0xac7b9AE8a28F125A57Abde64eD3CE80a17237931"
+      }
+    }
+  },
+  "0x9b4": {
+    "chainId": 2484,
+    "chainName": "Unicorn Ultra Nebulas Testnet",
+    "rpc": "https://rpc-nebulas-testnet.uniultra.xyz",
+    "explorer": "",
+    "nativeCurrency": {
+      "name": "U2U",
+      "symbol": "U2U",
+      "decimals": 18
+    },
+    "contracts": {
+      "silverbacks": {
+        "stableCoin": "0x0C3a2419E2885B52B6E468cE24A0101160dF2215",
+        "silverbacksNFT": "0xcfB147dadF551265872B70aF26B99A3560bd0Bc0",
+        "vault": "0xe29324a6753b39Ed8f580c8A2578473F84e781ab"
+      },
+      "kingLouis": {
+        "wbtc": "0x2ff0c3C6Dc8e91B68A21e0B5EaA749Bd6726F591",
+        "weth": "0x92557Be585DA9256D0c472E6768C9fCf1621F236",
+        "wltc": "0x54E8B98673ED89301A7307daCa930671a8d83210",
+        "multiTokenNFT": "0x1732b8Ed209Be0DE28020894f45E2346a0979d89",
+        "multiTokenVault": "0x37D1E36c90376dff9812F7837587FF9edfCF90cd"
+      }
     }
   }
 }

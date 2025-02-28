@@ -1,13 +1,19 @@
 require("@nomiclabs/hardhat-ethers");
 require("dotenv").config();
 
-const { PRIVATE_KEY, RPC_URL, LINEA_RPC_URL } = process.env;
+const { PRIVATE_KEY, RPC_URL, LINEA_RPC_URL, FLOW_TESTNET_RPC_URL, U2U_RPC_URL } = process.env;
 
 if (!RPC_URL) {
   throw new Error("Please set your RPC_URL in the .env file");
 }
 if (!LINEA_RPC_URL) {
   throw new Error("Please set your LINEA_RPC_URL in the .env file");
+}
+if (!FLOW_TESTNET_RPC_URL) {
+  throw new Error("Please set your FLOW_TESTNET_RPC_URL in the .env file");
+}
+if (!U2U_RPC_URL) {
+  throw new Error("Please set your U2U_RPC_URL in the .env file");
 }
 
 /**
@@ -35,8 +41,18 @@ module.exports = {
     },
     linea: {
       url: LINEA_RPC_URL,
-      chainId: 59141, // Updated to match the network where you have funds
+      chainId: 59141, // network where you have funds
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
     },
+    flowtestnet: {
+      url: FLOW_TESTNET_RPC_URL,
+      chainId: 0, // (chainId is obtained automatically if not specified, but you may set it if known)
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+    },
+    u2u: {
+      url: U2U_RPC_URL,
+      chainId: 2484,
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+    }
   },
 };
