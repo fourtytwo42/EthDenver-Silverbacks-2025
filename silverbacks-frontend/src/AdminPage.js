@@ -87,7 +87,7 @@ const AdminPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // NEW: Initialize Materialize select elements so they display correctly
+  // Initialize Materialize select elements
   useEffect(() => {
     if (window.M) {
       const elems = document.querySelectorAll("select");
@@ -135,14 +135,18 @@ const AdminPage = ({ currentAccount }) => {
   }, []);
 
   // -------------------------------------
-  // Load stablecoin balance and NFT data
+  // Load stablecoin balance and NFT data (using blockTag override)
   // -------------------------------------
   const loadData = async () => {
     if (!currentAccount || !contractAddresses) return;
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     try {
-      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
-      const bal = await stableCoinContract.balanceOf(currentAccount);
+      const stableCoinContract = new ethers.Contract(
+        contractAddresses.stableCoin,
+        stableCoinABI,
+        provider
+      );
+      const bal = await stableCoinContract.balanceOf(currentAccount, { blockTag: "latest" });
       log("StableCoin balance (raw) = " + bal.toString());
       setErc20Balance(ethers.utils.formatEther(bal));
     } catch (err) {
@@ -152,14 +156,18 @@ const AdminPage = ({ currentAccount }) => {
     let nftData = [];
     // Load Silverbacks NFTs
     if (contractAddresses.silverbacksNFT) {
-      const silverbacksNFTContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
+      const silverbacksNFTContract = new ethers.Contract(
+        contractAddresses.silverbacksNFT,
+        nftABI,
+        provider
+      );
       try {
-        const count = await silverbacksNFTContract.balanceOf(currentAccount);
+        const count = await silverbacksNFTContract.balanceOf(currentAccount, { blockTag: "latest" });
         log("You own " + count.toNumber() + " Silverbacks NFTs.");
         for (let i = 0; i < count.toNumber(); i++) {
-          const tokenId = await silverbacksNFTContract.tokenOfOwnerByIndex(currentAccount, i);
-          const faceVal = await silverbacksNFTContract.faceValue(tokenId);
-          const tokenURI = await silverbacksNFTContract.tokenURI(tokenId);
+          const tokenId = await silverbacksNFTContract.tokenOfOwnerByIndex(currentAccount, i, { blockTag: "latest" });
+          const faceVal = await silverbacksNFTContract.faceValue(tokenId, { blockTag: "latest" });
+          const tokenURI = await silverbacksNFTContract.tokenURI(tokenId, { blockTag: "latest" });
           log(`Silverbacks NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
           let metadata = {};
           try {
@@ -189,14 +197,18 @@ const AdminPage = ({ currentAccount }) => {
     }
     // Load King Louis NFTs
     if (contractAddresses.multiTokenNFT) {
-      const kinglouisNFTContract = new ethers.Contract(contractAddresses.multiTokenNFT, nftABI, provider);
+      const kinglouisNFTContract = new ethers.Contract(
+        contractAddresses.multiTokenNFT,
+        nftABI,
+        provider
+      );
       try {
-        const count = await kinglouisNFTContract.balanceOf(currentAccount);
+        const count = await kinglouisNFTContract.balanceOf(currentAccount, { blockTag: "latest" });
         log("You own " + count.toNumber() + " King Louis NFTs.");
         for (let i = 0; i < count.toNumber(); i++) {
-          const tokenId = await kinglouisNFTContract.tokenOfOwnerByIndex(currentAccount, i);
-          const faceVal = await kinglouisNFTContract.faceValue(tokenId);
-          const tokenURI = await kinglouisNFTContract.tokenURI(tokenId);
+          const tokenId = await kinglouisNFTContract.tokenOfOwnerByIndex(currentAccount, i, { blockTag: "latest" });
+          const faceVal = await kinglouisNFTContract.faceValue(tokenId, { blockTag: "latest" });
+          const tokenURI = await kinglouisNFTContract.tokenURI(tokenId, { blockTag: "latest" });
           log(`King Louis NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
           let metadata = {};
           try {
@@ -234,7 +246,7 @@ const AdminPage = ({ currentAccount }) => {
   }, [currentAccount, contractAddresses]);
 
   // -------------------------------------
-  // Load ERC20 token balances for connected wallet.
+  // Load ERC20 token balances for connected wallet (with blockTag override)
   // -------------------------------------
   const loadTokenBalances = async () => {
     if (!currentAccount || !contractAddresses) return;
@@ -242,22 +254,22 @@ const AdminPage = ({ currentAccount }) => {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       if (contractAddresses.stableCoin) {
         const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
-        const balance = await stableCoinContract.balanceOf(currentAccount);
+        const balance = await stableCoinContract.balanceOf(currentAccount, { blockTag: "latest" });
         setStableCoinBalance(ethers.utils.formatEther(balance));
       }
       if (contractAddresses.wbtc) {
         const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, provider);
-        const balance = await wbtcContract.balanceOf(currentAccount);
+        const balance = await wbtcContract.balanceOf(currentAccount, { blockTag: "latest" });
         setWbtcBalance(ethers.utils.formatEther(balance));
       }
       if (contractAddresses.weth) {
         const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, provider);
-        const balance = await wethContract.balanceOf(currentAccount);
+        const balance = await wethContract.balanceOf(currentAccount, { blockTag: "latest" });
         setWethBalance(ethers.utils.formatEther(balance));
       }
       if (contractAddresses.wltc) {
         const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, provider);
-        const balance = await wltcContract.balanceOf(currentAccount);
+        const balance = await wltcContract.balanceOf(currentAccount, { blockTag: "latest" });
         setWltcBalance(ethers.utils.formatEther(balance));
       }
     } catch (error) {
@@ -319,17 +331,17 @@ const AdminPage = ({ currentAccount }) => {
 
   // --------------------------------------------------
   // Helper function to safely approve token allowances.
-  // Some tokens require resetting allowance to 0 before a new approval.
+  // Passes a blockTag override and gasLimit to fix unichain errors.
   // --------------------------------------------------
   const safeApprove = async (tokenContract, tokenSymbol, spender, amount) => {
-    const currentAllowance = await tokenContract.allowance(currentAccount, spender);
+    const currentAllowance = await tokenContract.allowance(currentAccount, spender, { blockTag: "latest" });
     if (currentAllowance.gt(0)) {
       log(`Resetting ${tokenSymbol} allowance to 0...`);
-      let tx = await tokenContract.approve(spender, 0);
+      let tx = await tokenContract.approve(spender, 0, { gasLimit: 100000 });
       await tx.wait();
     }
     log(`Approving vault to spend ${ethers.utils.formatUnits(amount, 18)} ${tokenSymbol}...`);
-    let tx = await tokenContract.approve(spender, amount);
+    let tx = await tokenContract.approve(spender, amount, { gasLimit: 100000 });
     await tx.wait();
   };
 
