@@ -1,4 +1,5 @@
 // src/RedemptionPage.js
+
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
@@ -141,7 +142,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       <h1 style={{ margin: 0, fontSize: "1.5rem" }}>Silverbacks</h1>
       <p style={{ margin: 0, fontSize: "1.2rem" }}>
         {urlNetworkParam ? urlNetworkParam.toUpperCase() : "NETWORK"} | Balance:{" "}
-        {erc20Balance !== null ? erc20Balance : "0"} StableCoin
+        {erc20Balance !== null ? erc20Balance : "0"} RLUSD
       </p>
     </div>
   );
@@ -316,7 +317,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
     loadContracts();
   }, [urlNetworkParam]);
 
-  // Load ERC20 stablecoin balance for connected wallet.
+  // Load ERC20 RLUSD balance for connected wallet.
   const loadERC20Balance = async () => {
     if (!currentAccount || !contractAddresses) return;
     try {
@@ -709,7 +710,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         <p style={{ fontSize: "1rem", textAlign: "center" }}>
           {redeemNfts.some(n => n.type === "kinglouis")
             ? "Redeem: Burns the NFT and credits your wallet with the ERC20 tokens held by the note."
-            : "Redeem: Burns the NFT and credits your wallet with $100 in stablecoin."}
+            : "Redeem: Burns the NFT and credits your wallet with $100 in RLUSD."}
           <br />
           Claim: Transfers the NFT from the paper note to your connected wallet.
         </p>

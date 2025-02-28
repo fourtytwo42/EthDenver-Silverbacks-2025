@@ -209,6 +209,17 @@ async function main() {
       contracts: {}
     };
   }
+  // For Somnia Testnet (chainId 50312 -> hex "0xc488")
+  else if (chainIdHex === "0xc488") {
+    networkConfig = {
+      chainId: network.chainId,
+      chainName: "Somnia Testnet",
+      rpc: process.env.SOMNIA_RPC_URL,
+      explorer: "https://somnia-testnet.socialscan.io",
+      nativeCurrency: { name: "Somnia", symbol: "STT", decimals: 18 },
+      contracts: {}
+    };
+  }
   else {
     // Fallback: use the network name and empty rpc/explorer fields.
     networkConfig = {

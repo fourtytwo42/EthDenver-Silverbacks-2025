@@ -1,6 +1,6 @@
 {
   "0xaa36a7": {
-    "chainId": "0xaa36a7",
+    "chainId": 11155111,
     "chainName": "ethereum-sepolia",
     "rpc": "https://rpc.sepolia.org",
     "explorer": "https://sepolia.etherscan.io",
@@ -10,9 +10,14 @@
       "decimals": 18
     },
     "contracts": {
-      "stableCoin": "0xB39984DBE35367E56F61178D88c4088b7290B066",
-      "silverbacksNFT": "0xc470C7E107861c87F2163Aeb4A335e0d4a6Adbb6",
-      "vault": "0x6B8239D5C8F84302F60c6eA73A1A0B274f00eE7A"
+        "stableCoin": "0xe101FB315a64cDa9944E570a7bFfaFE60b994b1D",
+        "silverbacksNFT": "0x17a7272614E2f71c80F6157232F618dfE7ba416F",
+        "vault": "0xa83AF564B06639e7751992211c084790660FC0E0",
+        "wbtc": "0x332607E64abAA3EDde8DB420DD73a44d20fdaB26",
+        "weth": "0x55D01214302638FE5af2A7aE2A1d9375c2613Cc5",
+        "wltc": "0x0424Ce00d4200E67555627FDb669a2687B95C43e",
+        "multiTokenNFT": "0xe34c62aB31f61F63b6cC3A9Ed3773342C5fFAe13",
+        "multiTokenVault": "0xf2E724961EEE614524433fF9Bed63b38B3278f9e"
     }
   },
   "0xe705": {
@@ -150,6 +155,27 @@
     "nativeCurrency": {
       "name": "IP",
       "symbol": "IP",
+      "decimals": 18
+    },
+    "contracts": {
+        "stableCoin": "0x0C3a2419E2885B52B6E468cE24A0101160dF2215",
+        "silverbacksNFT": "0xcfB147dadF551265872B70aF26B99A3560bd0Bc0",
+        "vault": "0xe29324a6753b39Ed8f580c8A2578473F84e781ab",
+        "wbtc": "0x2ff0c3C6Dc8e91B68A21e0B5EaA749Bd6726F591",
+        "weth": "0x92557Be585DA9256D0c472E6768C9fCf1621F236",
+        "wltc": "0x54E8B98673ED89301A7307daCa930671a8d83210",
+        "multiTokenNFT": "0x1732b8Ed209Be0DE28020894f45E2346a0979d89",
+        "multiTokenVault": "0x37D1E36c90376dff9812F7837587FF9edfCF90cd"
+    }
+  },
+  "0xc488": {
+    "chainId": 50312,
+    "chainName": "somnia-testnet",
+    "rpc": "https://dream-rpc.somnia.network",
+    "explorer": "https://somnia-testnet.socialscan.io",
+    "nativeCurrency": {
+      "name": "Somnia",
+      "symbol": "STT",
       "decimals": 18
     },
     "contracts": {

@@ -1,7 +1,7 @@
 require("@nomiclabs/hardhat-ethers");
 require("dotenv").config();
 
-const { PRIVATE_KEY, RPC_URL, LINEA_RPC_URL, FLOW_TESTNET_RPC_URL, U2U_RPC_URL, STORYAENEID_RPC_URL } = process.env;
+const { PRIVATE_KEY, RPC_URL, LINEA_RPC_URL, FLOW_TESTNET_RPC_URL, U2U_RPC_URL, STORYAENEID_RPC_URL, SOMNIA_RPC_URL } = process.env;
 
 if (!RPC_URL) {
   throw new Error("Please set your RPC_URL in the .env file");
@@ -17,6 +17,9 @@ if (!U2U_RPC_URL) {
 }
 if (!STORYAENEID_RPC_URL) {
   throw new Error("Please set your STORYAENEID_RPC_URL in the .env file");
+}
+if (!SOMNIA_RPC_URL) {
+  throw new Error("Please set your SOMNIA_RPC_URL in the .env file");
 }
 
 /**
@@ -60,6 +63,11 @@ module.exports = {
     storyaeneid: {
       url: STORYAENEID_RPC_URL,
       chainId: 1315,
+      accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
+    },
+    somnia: {
+      url: SOMNIA_RPC_URL,
+      chainId: 50312,
       accounts: PRIVATE_KEY ? [PRIVATE_KEY] : [],
     }
   },

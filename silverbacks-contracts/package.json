@@ -7,11 +7,13 @@
     "deploy:silverbacks:flowtestnet": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network flowtestnet",
     "deploy:silverbacks:u2u": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network u2u",
     "deploy:silverbacks:storyaeneid": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network storyaeneid",
+    "deploy:silverbacks:somnia": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network somnia",
     "deploy:multitoken:sepolia": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network sepolia",
     "deploy:multitoken:linea": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network linea",
     "deploy:multitoken:flowtestnet": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network flowtestnet",
     "deploy:multitoken:u2u": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network u2u",
     "deploy:multitoken:storyaeneid": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network storyaeneid",
+    "deploy:multitoken:somnia": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network somnia",
     "test": "npx hardhat test"
   },
   "dependencies": {
