@@ -1,3 +1,4 @@
+// src/AdminPage.js
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { create } from "ipfs-http-client";
@@ -34,6 +35,10 @@ const vaultABI = [
   "function claimNFT(uint256, bytes) external"
 ];
 
+const REQUIRED_WBTC = ethers.utils.parseUnits("0.05", 18);
+const REQUIRED_WETH = ethers.utils.parseUnits("0.5", 18);
+const REQUIRED_WLTC = ethers.utils.parseUnits("3", 18);
+
 const AdminPage = ({ currentAccount }) => {
   // State declarations
   const [depositAmount, setDepositAmount] = useState("100");
@@ -61,11 +66,6 @@ const AdminPage = ({ currentAccount }) => {
   const [wbtcBalance, setWbtcBalance] = useState("");
   const [wethBalance, setWethBalance] = useState("");
   const [wltcBalance, setWltcBalance] = useState("");
-
-  // Required amounts for King Louis deposits
-  const REQUIRED_WBTC = ethers.utils.parseUnits("0.05", 18);
-  const REQUIRED_WETH = ethers.utils.parseUnits("0.5", 18);
-  const REQUIRED_WLTC = ethers.utils.parseUnits("3", 18);
 
   const tabButtonStyle = {
     padding: "10px 20px",
@@ -317,6 +317,22 @@ const AdminPage = ({ currentAccount }) => {
       : contractAddresses.multiTokenVault;
   };
 
+  // --------------------------------------------------
+  // Helper function to safely approve token allowances.
+  // Some tokens require resetting allowance to 0 before a new approval.
+  // --------------------------------------------------
+  const safeApprove = async (tokenContract, tokenSymbol, spender, amount) => {
+    const currentAllowance = await tokenContract.allowance(currentAccount, spender);
+    if (currentAllowance.gt(0)) {
+      log(`Resetting ${tokenSymbol} allowance to 0...`);
+      let tx = await tokenContract.approve(spender, 0);
+      await tx.wait();
+    }
+    log(`Approving vault to spend ${ethers.utils.formatUnits(amount, 18)} ${tokenSymbol}...`);
+    let tx = await tokenContract.approve(spender, amount);
+    await tx.wait();
+  };
+
   // -------------------------------------
   // Silverbacks Deposit Functions
   // -------------------------------------
@@ -372,7 +388,7 @@ const AdminPage = ({ currentAccount }) => {
       const signer = provider.getSigner();
       const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
       let approveTx = await stableCoinContract.approve(getVaultAddress(), depositWei);
-      log("Approving vault to spend 100 tokens...");
+      log("Approving vault for 100 tokens...");
       await approveTx.wait();
       log("Approval confirmed.");
       const vaultContract = new ethers.Contract(getVaultAddress(), vaultABI, signer);
@@ -386,6 +402,81 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
+  // -------------------------------------
+  // King Louis Deposit Functions
+  // -------------------------------------
+  const handleDepositKingLouis = async () => {
+    if (!frontImageFile || !backImageFile) {
+      alert("Please select both front and back images.");
+      return;
+    }
+    try {
+      const metaURI = await uploadMetadataToIPFS(frontImageFile, backImageFile);
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const vaultAddress = getVaultAddress();
+      if (!vaultAddress) {
+        alert("Vault address not found for selected NFT type.");
+        return;
+      }
+      // Approve each token (for King Louis, tokens like WBTC, WETH, WLTC are required)
+      const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
+      const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
+      const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
+      await safeApprove(wbtcContract, "WBTC", vaultAddress, REQUIRED_WBTC);
+      await safeApprove(wethContract, "WETH", vaultAddress, REQUIRED_WETH);
+      await safeApprove(wltcContract, "WLTC", vaultAddress, REQUIRED_WLTC);
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      // Pass 0 as the dummy deposit amount for King Louis
+      let tx = await vaultContract.deposit(0, metaURI);
+      log("Depositing tokens and minting King Louis NFT...");
+      await tx.wait();
+      log("Deposit transaction confirmed!");
+      loadData();
+    } catch (err) {
+      log("Error in King Louis deposit: " + err.message);
+    }
+  };
+
+  const handleDepositToKingLouis = async () => {
+    if (!depositRecipient || !ethers.utils.isAddress(depositRecipient)) {
+      alert("Please enter a valid recipient address.");
+      return;
+    }
+    if (!frontImageFile || !backImageFile) {
+      alert("Please select both front and back images.");
+      return;
+    }
+    try {
+      const metaURI = await uploadMetadataToIPFS(frontImageFile, backImageFile);
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const vaultAddress = getVaultAddress();
+      if (!vaultAddress) {
+        alert("Vault address not found for selected NFT type.");
+        return;
+      }
+      const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
+      const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
+      const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
+      await safeApprove(wbtcContract, "WBTC", vaultAddress, REQUIRED_WBTC);
+      await safeApprove(wethContract, "WETH", vaultAddress, REQUIRED_WETH);
+      await safeApprove(wltcContract, "WLTC", vaultAddress, REQUIRED_WLTC);
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      // Pass 0 as the dummy deposit amount for King Louis
+      let tx = await vaultContract.depositTo(depositRecipient, 0, metaURI);
+      log("Depositing tokens and minting King Louis NFT to " + depositRecipient + "...");
+      await tx.wait();
+      log("DepositTo transaction confirmed!");
+      loadData();
+    } catch (err) {
+      log("Error in King Louis depositTo: " + err.message);
+    }
+  };
+
+  // -------------------------------------
+  // CSV Batch Deposit Functions (Silverbacks & King Louis)
+  // -------------------------------------
   const handleCSVDeposit = async () => {
     if (!csvFile) {
       alert("Please select a CSV file.");
@@ -442,90 +533,6 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // -------------------------------------
-  // King Louis Deposit Functions
-  // -------------------------------------
-  const handleDepositKingLouis = async () => {
-    if (!frontImageFile || !backImageFile) {
-      alert("Please select both front and back images.");
-      return;
-    }
-    try {
-      const metaURI = await uploadMetadataToIPFS(frontImageFile, backImageFile);
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      const vaultAddress = getVaultAddress();
-      if (!vaultAddress) {
-        alert("Vault address not found for selected NFT type.");
-        return;
-      }
-      // Approve each token (for King Louis, tokens like WBTC, WETH, WLTC are required)
-      const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
-      const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
-      const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
-      let tx = await wbtcContract.approve(vaultAddress, REQUIRED_WBTC);
-      log("Approving vault to spend 0.05 WBTC...");
-      await tx.wait();
-      tx = await wethContract.approve(vaultAddress, REQUIRED_WETH);
-      log("Approving vault to spend 0.5 WETH...");
-      await tx.wait();
-      tx = await wltcContract.approve(vaultAddress, REQUIRED_WLTC);
-      log("Approving vault to spend 3 WLTC...");
-      await tx.wait();
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      // Pass 0 as the dummy deposit amount for King Louis
-      tx = await vaultContract.deposit(0, metaURI);
-      log("Depositing tokens and minting King Louis NFT...");
-      await tx.wait();
-      log("Deposit transaction confirmed!");
-      loadData();
-    } catch (err) {
-      log("Error in King Louis deposit: " + err.message);
-    }
-  };
-
-  const handleDepositToKingLouis = async () => {
-    if (!depositRecipient || !ethers.utils.isAddress(depositRecipient)) {
-      alert("Please enter a valid recipient address.");
-      return;
-    }
-    if (!frontImageFile || !backImageFile) {
-      alert("Please select both front and back images.");
-      return;
-    }
-    try {
-      const metaURI = await uploadMetadataToIPFS(frontImageFile, backImageFile);
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      const vaultAddress = getVaultAddress();
-      if (!vaultAddress) {
-        alert("Vault address not found for selected NFT type.");
-        return;
-      }
-      const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
-      const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
-      const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
-      let tx = await wbtcContract.approve(vaultAddress, REQUIRED_WBTC);
-      log("Approving vault to spend 0.05 WBTC...");
-      await tx.wait();
-      tx = await wethContract.approve(vaultAddress, REQUIRED_WETH);
-      log("Approving vault to spend 0.5 WETH...");
-      await tx.wait();
-      tx = await wltcContract.approve(vaultAddress, REQUIRED_WLTC);
-      log("Approving vault to spend 3 WLTC...");
-      await tx.wait();
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      // Pass 0 as the dummy deposit amount for King Louis
-      tx = await vaultContract.depositTo(depositRecipient, 0, metaURI);
-      log("Depositing tokens and minting King Louis NFT to " + depositRecipient + "...");
-      await tx.wait();
-      log("DepositTo transaction confirmed!");
-      loadData();
-    } catch (err) {
-      log("Error in King Louis depositTo: " + err.message);
-    }
-  };
-
   const handleCSVDepositKingLouis = async () => {
     if (!csvFile) {
       alert("Please select a CSV file.");
@@ -577,17 +584,11 @@ const AdminPage = ({ currentAccount }) => {
       const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
       const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
       const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
-      let tx = await wbtcContract.approve(vaultAddress, totalWbtc);
-      log("Approving vault to spend total " + ethers.utils.formatUnits(totalWbtc, 18) + " WBTC...");
-      await tx.wait();
-      tx = await wethContract.approve(vaultAddress, totalWeth);
-      log("Approving vault to spend total " + ethers.utils.formatUnits(totalWeth, 18) + " WETH...");
-      await tx.wait();
-      tx = await wltcContract.approve(vaultAddress, totalWltc);
-      log("Approving vault to spend total " + ethers.utils.formatUnits(totalWltc, 18) + " WLTC...");
-      await tx.wait();
+      await safeApprove(wbtcContract, "WBTC", vaultAddress, totalWbtc);
+      await safeApprove(wethContract, "WETH", vaultAddress, totalWeth);
+      await safeApprove(wltcContract, "WLTC", vaultAddress, totalWltc);
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      tx = await vaultContract.batchDeposit(recipients, metadataURIs);
+      let tx = await vaultContract.batchDeposit(recipients, metadataURIs);
       log("Batch deposit transaction submitted for King Louis NFTs...");
       await tx.wait();
       log("Batch deposit transaction confirmed!");
