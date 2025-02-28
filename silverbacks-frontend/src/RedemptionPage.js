@@ -1,5 +1,3 @@
-// src/RedemptionPage.js
-
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { useSearchParams } from "react-router-dom";
@@ -28,6 +26,18 @@ const vaultABI = [
   "function claimNFT(uint256 tokenId, bytes signature) external"
 ];
 
+// Helper to force legacy transactions on Somnia
+const getTxOverrides = async () => {
+  const provider = new ethers.providers.Web3Provider(window.ethereum);
+  const network = await provider.getNetwork();
+  const chainIdHex = "0x" + network.chainId.toString(16);
+  if (chainIdHex.toLowerCase() === "0xc488") {
+    return { type: 0, gasPrice: ethers.utils.parseUnits("10", "gwei") };
+  } else {
+    return {};
+  }
+};
+
 const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   // Detect mobile browser
   const isMobile = /Mobi|Android/i.test(navigator.userAgent);
@@ -36,9 +46,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   const handleMobileWalletSelection = (walletType) => {
     const currentUrl = window.location.href;
     if (walletType === "coinbase") {
-      window.location.href = `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(
-        currentUrl
-      )}`;
+      window.location.href = `https://go.cb-w.com/dapp?cb_url=${encodeURIComponent(currentUrl)}`;
     } else if (walletType === "metamask") {
       const domain = window.location.hostname;
       const pathAndQuery = window.location.pathname + window.location.search;
@@ -164,7 +172,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
   // Other state variables.
   const [ownerAddress, setOwnerAddress] = useState("");
   const [redeemNfts, setRedeemNFTs] = useState([]);
-  const [myNfts, setMyNFTs] = useState([]);
+  const [myNfts, setMyNfts] = useState([]);
   const [logMessages, setLogMessages] = useState([]);
   const [contractAddresses, setContractAddresses] = useState(null);
   const [scanning, setScanning] = useState(false);
@@ -641,7 +649,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         const messageHashBytes = ethers.utils.arrayify(msg);
         signature = await ephemeralWallet.signMessage(messageHashBytes);
         log(`Ephemeral signature (redeem): ${signature}`);
-        tx = await vaultContract.redeemTo(nft.tokenId, signature);
+        tx = await vaultContract.redeemTo(nft.tokenId, signature, await getTxOverrides());
         log(`redeemTo transaction sent for tokenId=${nft.tokenId}`);
         await tx.wait();
         log(`redeemTo confirmed for tokenId=${nft.tokenId}`);
@@ -651,7 +659,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
         const messageHashBytes = ethers.utils.arrayify(msg);
         signature = await ephemeralWallet.signMessage(messageHashBytes);
         log(`Ephemeral signature (claim): ${signature}`);
-        tx = await vaultContract.claimNFT(nft.tokenId, signature);
+        tx = await vaultContract.claimNFT(nft.tokenId, signature, await getTxOverrides());
         log(`claimNFT transaction sent for tokenId=${nft.tokenId}`);
         await tx.wait();
         log(`claimNFT confirmed for tokenId=${nft.tokenId}`);
@@ -670,7 +678,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       const vaultAddress = nft.type === "silverbacks" ? contractAddresses.vault : contractAddresses.multiTokenVault;
       const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
       log(`Redeeming NFT tokenId ${nft.tokenId}...`);
-      const tx = await vaultContract.redeem(nft.tokenId, { gasLimit: 10000000 });
+      const tx = await vaultContract.redeem(nft.tokenId, { gasLimit: 10000000, ...(await getTxOverrides()) });
       await tx.wait();
       log(`Redeem confirmed for tokenId ${nft.tokenId}`);
       loadMyNFTs();
@@ -692,7 +700,7 @@ const RedemptionPage = ({ currentAccount, setCurrentAccount }) => {
       const nftContractAddress = nft.type === "silverbacks" ? contractAddresses.silverbacksNFT : contractAddresses.multiTokenNFT;
       const nftContract = new ethers.Contract(nftContractAddress, nftABI, signer);
       log(`Sending NFT tokenId ${nft.tokenId} to ${recipient}...`);
-      const tx = await nftContract["safeTransferFrom(address,address,uint256)"](currentAccount, recipient, nft.tokenId);
+      const tx = await nftContract["safeTransferFrom(address,address,uint256)"](currentAccount, recipient, nft.tokenId, await getTxOverrides());
       await tx.wait();
       log(`NFT tokenId ${nft.tokenId} sent to ${recipient}`);
       loadMyNFTs();
