@@ -1,4 +1,4 @@
-require("@nomiclabs/hardhat-ethers");
+const hre = require("hardhat");
 const fs = require("fs");
 const path = require("path");
 require("dotenv").config();
@@ -9,7 +9,7 @@ if (!DEPLOY_SET) {
 }
 
 /**
- * Global variable for nonce management.
+ * Global variable for nonce management (used on non‑zkSync networks).
  */
 let currentNonce;
 
@@ -24,56 +24,79 @@ async function sendTransaction(txPromise) {
 }
 
 /**
- * Helper function to deploy a contract using our manual nonce.
+ * Helper function to deploy a contract.
+ *
+ * - For zkSync networks (hre.network.config.zksync === true), we call the zkSync deploy task.
+ *   (The task is registered as "deployContract" by @matterlabs/hardhat-zksync-deploy.)
+ * - For other networks, we deploy using manual nonce management.
  */
 async function deployContract(contractFactory, contractName, ...args) {
   const [deployer] = await ethers.getSigners();
   console.log(`Deploying ${contractName} from address: ${deployer.address}`);
-  const overrides = { nonce: currentNonce };
-  
-  try {
-    const deployTx = contractFactory.getDeployTransaction(...args, overrides);
-    const estimatedGas = await deployer.estimateGas(deployTx);
-    const gasPrice = await deployer.getGasPrice();
-    const estimatedCost = estimatedGas.mul(gasPrice);
-    console.log(
-      `Estimated cost for ${contractName} deployment: ${ethers.utils.formatEther(estimatedCost)} ETH`
-    );
-  } catch (err) {
-    console.error("Error estimating gas: ", err.message);
-  }
-  
-  try {
-    const instance = await contractFactory.deploy(...args, overrides);
-    await instance.deployed();
+
+  if (hre.network.config.zksync) {
+    console.log(`Deploying ${contractName} on zkSync using hre.run("deployContract")...`);
+    const instance = await hre.run("deployContract", {
+      contract: contractName,
+      constructorArguments: args,
+    });
     console.log(`${contractName} deployed at: ${instance.address}`);
-    currentNonce++; // update nonce
     return instance;
-  } catch (err) {
-    if (err.message.includes("Upfront cost exceeds account balance")) {
-      const balance = await deployer.getBalance();
-      console.error("Upfront cost exceeds account balance");
-      console.error(`Deployer address: ${deployer.address}`);
-      console.error(`Deployer balance: ${ethers.utils.formatEther(balance)} ETH`);
+  } else {
+    const overrides = { nonce: currentNonce };
+    try {
+      try {
+        const deployTx = contractFactory.getDeployTransaction(...args, overrides);
+        try {
+          const estimatedGas = await deployer.estimateGas(deployTx);
+          const gasPrice = await deployer.getGasPrice();
+          const estimatedCost = estimatedGas.mul(gasPrice);
+          console.log(
+            `Estimated cost for ${contractName} deployment: ${ethers.utils.formatEther(estimatedCost)} ETH`
+          );
+        } catch (err) {
+          if (err.message.includes("toAddressIsNull")) {
+            console.warn("Gas estimation skipped due to serialization issue.");
+          } else {
+            console.error("Error estimating gas: ", err.message);
+          }
+        }
+        const instance = await contractFactory.deploy(...args, overrides);
+        await instance.deployed();
+        console.log(`${contractName} deployed at: ${instance.address}`);
+        currentNonce++;
+        return instance;
+      } catch (err) {
+        if (err.message.includes("Upfront cost exceeds account balance")) {
+          const balance = await deployer.getBalance();
+          console.error("Upfront cost exceeds account balance");
+          console.error(`Deployer address: ${deployer.address}`);
+          console.error(`Deployer balance: ${ethers.utils.formatEther(balance)} ETH`);
+        }
+        throw err;
+      }
+    } catch (err) {
+      throw err;
     }
-    throw err;
   }
 }
 
 async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Starting deployment with deployer address:", deployer.address);
-  
-  // Initialize global nonce.
-  currentNonce = await deployer.getTransactionCount();
-  console.log("Starting nonce:", currentNonce);
 
-  // Object to collect deployed contract addresses
+  // Initialize global nonce for non‑zkSync networks.
+  if (!hre.network.config.zksync) {
+    currentNonce = await deployer.getTransactionCount();
+    console.log("Starting nonce:", currentNonce);
+  }
+
+  // Object to collect deployed contract addresses.
   const deployedContracts = {};
 
   if (DEPLOY_SET === "silverbacks") {
     console.log("Deploying Silverbacks contracts...");
-    
+
     // --- Determine StableCoin ---
     let stableCoinAddress;
     if (process.env.EXISTING_STABLECOIN_ADDRESS && process.env.EXISTING_STABLECOIN_ADDRESS.trim() !== "") {
@@ -92,29 +115,32 @@ async function main() {
       stableCoinAddress = stableCoin.address;
       deployedContracts.stableCoin = stableCoinAddress;
     }
-    
+
     // Deploy SilverbacksNFT.
     const SilverbacksNFTFactory = await ethers.getContractFactory("SilverbacksNFT");
     const nft = await deployContract(SilverbacksNFTFactory, "SilverbacksNFT", "SilverbacksNFT", "SBX");
     let tx = await sendTransaction(nft.setBaseURI("https://rays-automobile-clearly.quicknode-ipfs.com/ipfs/"));
     console.log("Base URI set for SilverbacksNFT");
     deployedContracts.silverbacksNFT = nft.address;
-    
+
     // Deploy SilverbacksVault.
     const SilverbacksVaultFactory = await ethers.getContractFactory("SilverbacksVault");
     const vault = await deployContract(SilverbacksVaultFactory, "SilverbacksVault", stableCoinAddress, nft.address);
     tx = await sendTransaction(nft.setVaultContract(vault.address));
     console.log("Vault contract set in SilverbacksNFT");
     deployedContracts.vault = vault.address;
-    
+
+    // Mint additional stablecoins if needed.
     if (!process.env.EXISTING_STABLECOIN_ADDRESS || process.env.EXISTING_STABLECOIN_ADDRESS.trim() === "") {
       const StableCoinFactory = await ethers.getContractFactory("MyStableCoin");
-      tx = await sendTransaction(StableCoinFactory.attach(stableCoinAddress).mint(deployer.address, ethers.utils.parseUnits("10000", 18)));
+      tx = await sendTransaction(
+        StableCoinFactory.attach(stableCoinAddress).mint(deployer.address, ethers.utils.parseUnits("10000", 18))
+      );
       console.log("Minted 10000 stablecoins to deployer.");
     }
   } else if (DEPLOY_SET === "multitoken") {
     console.log("Deploying King Louis (MultiToken) contracts...");
-    
+
     const MyERC20TokenFactory = await ethers.getContractFactory("MyERC20Token");
     const initialSupply = ethers.utils.parseUnits("1000", 18);
     const wbtc = await deployContract(MyERC20TokenFactory, "WBTC", "WBTC", "WBTC", initialSupply);
@@ -123,13 +149,13 @@ async function main() {
     deployedContracts.wbtc = wbtc.address;
     deployedContracts.weth = weth.address;
     deployedContracts.wltc = wltc.address;
-    
+
     const MultiTokenNFTFactory = await ethers.getContractFactory("MultiTokenNFT");
     const multiNFT = await deployContract(MultiTokenNFTFactory, "MultiTokenNFT", "MultiTokenNFT", "MTNFT");
     let tx = await sendTransaction(multiNFT.setBaseURI("https://your-multitoken-nft-metadata.example/ipfs/"));
     console.log("Base URI set for MultiTokenNFT");
     deployedContracts.multiTokenNFT = multiNFT.address;
-    
+
     const MultiTokenVaultFactory = await ethers.getContractFactory("MultiTokenVault");
     const multiVault = await deployContract(
       MultiTokenVaultFactory,
@@ -145,7 +171,7 @@ async function main() {
   } else {
     throw new Error("Invalid DEPLOY_SET value. Must be either 'silverbacks' or 'multitoken'");
   }
-  
+
   // --- Save deployment addresses to chains.json ---
   const networkData = await ethers.provider.getNetwork();
   const chainIdHex = "0x" + networkData.chainId.toString(16);
@@ -159,10 +185,9 @@ async function main() {
       console.error("Error reading chains.json:", err);
     }
   }
-  
+
   // Build a network configuration object based on known networks.
   let networkConfig = {};
-  // Ethereum Sepolia (chainId 0xaa36a7)
   if (chainIdHex === "0xaa36a7") {
     networkConfig = {
       chainId: networkData.chainId,
@@ -172,9 +197,7 @@ async function main() {
       nativeCurrency: { name: "SepoliaETH", symbol: "ETH", decimals: 18 },
       contracts: {}
     };
-  }
-  // Linea Sepolia (chainId 0xe705)
-  else if (chainIdHex === "0xe705") {
+  } else if (chainIdHex === "0xe705") {
     networkConfig = {
       chainId: networkData.chainId,
       chainName: "linea-sepolia",
@@ -183,9 +206,7 @@ async function main() {
       nativeCurrency: { name: "LineaETH", symbol: "LineaETH", decimals: 18 },
       contracts: {}
     };
-  }
-  // Flow Testnet (chainId 545 → hex "0x221")
-  else if (chainIdHex === "0x221") {
+  } else if (chainIdHex === "0x221") {
     networkConfig = {
       chainId: networkData.chainId,
       chainName: "flow-testnet",
@@ -194,20 +215,16 @@ async function main() {
       nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
       contracts: {}
     };
-  }
-  // Unicorn Ultra Nebulas Testnet (U2U, chainId 2484 → hex "0x9b4")
-  else if (chainIdHex === "0x9b4") {
+  } else if (chainIdHex === "0x9b4") {
     networkConfig = {
       chainId: networkData.chainId,
       chainName: "u2u-testnet",
       rpc: process.env.U2U_RPC_URL,
-      explorer: "", // Set explorer URL if available
+      explorer: "",
       nativeCurrency: { name: "U2U", symbol: "U2U", decimals: 18 },
       contracts: {}
     };
-  }
-  // Unichain Sepolia (chainId 1301 → hex "0x515")
-  else if (chainIdHex === "0x515") {
+  } else if (chainIdHex === "0x515") {
     networkConfig = {
       chainId: networkData.chainId,
       chainName: "Unichain Sepolia",
@@ -216,20 +233,16 @@ async function main() {
       nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
       contracts: {}
     };
-  }
-  // Zircuit Testnet (chainId 48899 → hex "0xbf03")
-  else if (chainIdHex === "0xbf03") {
+  } else if (chainIdHex === "0xbf03") {
     networkConfig = {
       chainId: networkData.chainId,
-      chainName: "Zircuit Testnet",
+      chainName: "zircuit-testnet",
       rpc: process.env.ZIRCUIT_TESTNET_RPC_URL,
       explorer: "https://explorer.testnet.zircuit.com",
       nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
       contracts: {}
     };
-  }
-  // zkSync Sepolia (chainId 300 → hex "0x12c")
-  else if (chainIdHex === "0x12c") {
+  } else if (chainIdHex === "0x12c") {
     networkConfig = {
       chainId: networkData.chainId,
       chainName: "zkSync Sepolia",
@@ -238,9 +251,7 @@ async function main() {
       nativeCurrency: { name: "ETH", symbol: "ETH", decimals: 18 },
       contracts: {}
     };
-  }
-  else {
-    // Fallback configuration.
+  } else {
     networkConfig = {
       chainId: networkData.chainId,
       chainName: networkData.name,
@@ -250,7 +261,7 @@ async function main() {
       contracts: {}
     };
   }
-  
+
   // Merge any existing contracts for this chain.
   if (chains[chainIdHex] && chains[chainIdHex].contracts) {
     networkConfig.contracts = { ...chains[chainIdHex].contracts };

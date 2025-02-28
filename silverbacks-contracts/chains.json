@@ -138,5 +138,17 @@
       "multiTokenNFT": "0xA1D4f21b999F00555E37b7F94E135dE946416D85",
       "multiTokenVault": "0xF4829EdCe02dF1a140dDED810FDF218944447642"
     }
+  },
+  "0x12c": {
+    "contracts": {
+      "stableCoin": "0xBf7Da596F980050AF8d22d07493F0424F577119e",
+      "silverbacksNFT": "0x3F5986D535A0a1BcD28693B4840B93E1Cfa55Ee9",
+      "vault": "0x6bF454f851ED2a11D835212c0e75E859c5954048",
+      "wbtc": "0xE41a9861705F4d9A0be4175baE9947fBa5271873",
+      "weth": "0x9B21aAAEE77c77fF0c572fB94c4878d811b637Af",
+      "wltc": "0x8Fb0188eC63B521B6b19d1F0cc107e113f0f55b3",
+      "multiTokenNFT": "0xBd8B0C6669A00782793c5269A6eCf76607b1Fe73",
+      "multiTokenVault": "0xB1363ED24851d14dc2FaD7701Fd4e74a8276cEe5"
+    }
   }
 }
