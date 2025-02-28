@@ -6,10 +6,16 @@
     "deploy:silverbacks:linea": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network linea",
     "deploy:silverbacks:flowtestnet": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network flowtestnet",
     "deploy:silverbacks:u2u": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network u2u",
+    "deploy:silverbacks:unichain-sepolia": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network unichain_sepolia",
+    "deploy:silverbacks:zircuit-testnet": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network zircuit_testnet",
+    "deploy:silverbacks:zksync-sepolia": "cross-env DEPLOY_SET=silverbacks npx hardhat run scripts/deploy.js --network zksync_sepolia",
     "deploy:multitoken:sepolia": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network sepolia",
     "deploy:multitoken:linea": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network linea",
     "deploy:multitoken:flowtestnet": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network flowtestnet",
     "deploy:multitoken:u2u": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network u2u",
+    "deploy:multitoken:unichain-sepolia": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network unichain_sepolia",
+    "deploy:multitoken:zircuit-testnet": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network zircuit_testnet",
+    "deploy:multitoken:zksync-sepolia": "cross-env DEPLOY_SET=multitoken npx hardhat run scripts/deploy.js --network zksync_sepolia",
     "test": "npx hardhat test"
   },
   "dependencies": {

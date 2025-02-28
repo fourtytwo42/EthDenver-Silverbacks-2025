@@ -96,5 +96,47 @@
         "multiTokenVault": "0x37D1E36c90376dff9812F7837587FF9edfCF90cd"
       }
     }
+  },
+  "0x515": {
+    "chainId": 1301,
+    "chainName": "unichain-sepolia",
+    "rpc": "https://sepolia.unichain.org",
+    "explorer": "https://sepolia.uniscan.xyz",
+    "nativeCurrency": {
+      "name": "ETH",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "contracts": {
+      "stableCoin": "0x0C3a2419E2885B52B6E468cE24A0101160dF2215",
+      "silverbacksNFT": "0xcfB147dadF551265872B70aF26B99A3560bd0Bc0",
+      "vault": "0xe29324a6753b39Ed8f580c8A2578473F84e781ab",
+      "wbtc": "0x2ff0c3C6Dc8e91B68A21e0B5EaA749Bd6726F591",
+      "weth": "0x92557Be585DA9256D0c472E6768C9fCf1621F236",
+      "wltc": "0x54E8B98673ED89301A7307daCa930671a8d83210",
+      "multiTokenNFT": "0x1732b8Ed209Be0DE28020894f45E2346a0979d89",
+      "multiTokenVault": "0x37D1E36c90376dff9812F7837587FF9edfCF90cd"
+    }
+  },
+  "0xbf03": {
+    "chainId": 48899,
+    "chainName": "Zircuit Testnet",
+    "rpc": "https://zircuit1-testnet.p2pify.com",
+    "explorer": "https://explorer.testnet.zircuit.com",
+    "nativeCurrency": {
+      "name": "ETH",
+      "symbol": "ETH",
+      "decimals": 18
+    },
+    "contracts": {
+      "stableCoin": "0x54E8B98673ED89301A7307daCa930671a8d83210",
+      "silverbacksNFT": "0x1732b8Ed209Be0DE28020894f45E2346a0979d89",
+      "vault": "0x37D1E36c90376dff9812F7837587FF9edfCF90cd",
+      "wbtc": "0xF73649fdcDcDda16ce5183Bad63e87F14e2499cf",
+      "weth": "0x3F29e934a7294887A461cbB07591f523F2cb652F",
+      "wltc": "0x54e34273eAdF5762ABA315d88a08Bd108B3D0eA2",
+      "multiTokenNFT": "0xA1D4f21b999F00555E37b7F94E135dE946416D85",
+      "multiTokenVault": "0xF4829EdCe02dF1a140dDED810FDF218944447642"
+    }
   }
 }
