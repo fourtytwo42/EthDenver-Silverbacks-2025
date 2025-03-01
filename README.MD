@@ -1,6 +1,6 @@
 # Silverbacks Crypto Cash & King Louis Crypto Index Note
 
-![Project Banner](https://example.com/banner.png)
+![Project Banner](https://silverbacks.cash/wp-content/uploads/2025/03/Logo-2025-1.png)
 
 **Bridging Physical Cash with Digital Crypto Assets**
 
@@ -118,7 +118,7 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## Contact
 
-For questions or support, please contact [Your Name](mailto:youremail@example.com).
+For questions or support, please contact [Your Name](mailto:support@silverbacks.cash).
 
 ---
 
