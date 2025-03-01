@@ -1,4 +1,3 @@
-// src/AdminPage.js
 import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { create } from "ipfs-http-client";
@@ -35,9 +34,11 @@ const vaultABI = [
   "function claimNFT(uint256, bytes) external"
 ];
 
-const REQUIRED_WBTC = ethers.utils.parseUnits("0.05", 18);
+// For King Louis deposits, update token decimals for WBTC and WLTC.
+// WBTC and WLTC typically have 8 decimals; WETH remains at 18.
+const REQUIRED_WBTC = ethers.utils.parseUnits("0.05", 8);
 const REQUIRED_WETH = ethers.utils.parseUnits("0.5", 18);
-const REQUIRED_WLTC = ethers.utils.parseUnits("3", 18);
+const REQUIRED_WLTC = ethers.utils.parseUnits("3", 8);
 
 const AdminPage = ({ currentAccount }) => {
   // State declarations
@@ -87,7 +88,7 @@ const AdminPage = ({ currentAccount }) => {
     setLogMessages((prev) => [...prev, msg]);
   };
 
-  // Initialize Materialize select elements
+  // NEW: Initialize Materialize select elements so they display correctly
   useEffect(() => {
     if (window.M) {
       const elems = document.querySelectorAll("select");
@@ -135,18 +136,14 @@ const AdminPage = ({ currentAccount }) => {
   }, []);
 
   // -------------------------------------
-  // Load stablecoin balance and NFT data (using blockTag override)
+  // Load stablecoin balance and NFT data
   // -------------------------------------
   const loadData = async () => {
     if (!currentAccount || !contractAddresses) return;
     const provider = new ethers.providers.Web3Provider(window.ethereum);
     try {
-      const stableCoinContract = new ethers.Contract(
-        contractAddresses.stableCoin,
-        stableCoinABI,
-        provider
-      );
-      const bal = await stableCoinContract.balanceOf(currentAccount, { blockTag: "latest" });
+      const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
+      const bal = await stableCoinContract.balanceOf(currentAccount);
       log("StableCoin balance (raw) = " + bal.toString());
       setErc20Balance(ethers.utils.formatEther(bal));
     } catch (err) {
@@ -156,18 +153,14 @@ const AdminPage = ({ currentAccount }) => {
     let nftData = [];
     // Load Silverbacks NFTs
     if (contractAddresses.silverbacksNFT) {
-      const silverbacksNFTContract = new ethers.Contract(
-        contractAddresses.silverbacksNFT,
-        nftABI,
-        provider
-      );
+      const silverbacksNFTContract = new ethers.Contract(contractAddresses.silverbacksNFT, nftABI, provider);
       try {
-        const count = await silverbacksNFTContract.balanceOf(currentAccount, { blockTag: "latest" });
+        const count = await silverbacksNFTContract.balanceOf(currentAccount);
         log("You own " + count.toNumber() + " Silverbacks NFTs.");
         for (let i = 0; i < count.toNumber(); i++) {
-          const tokenId = await silverbacksNFTContract.tokenOfOwnerByIndex(currentAccount, i, { blockTag: "latest" });
-          const faceVal = await silverbacksNFTContract.faceValue(tokenId, { blockTag: "latest" });
-          const tokenURI = await silverbacksNFTContract.tokenURI(tokenId, { blockTag: "latest" });
+          const tokenId = await silverbacksNFTContract.tokenOfOwnerByIndex(currentAccount, i);
+          const faceVal = await silverbacksNFTContract.faceValue(tokenId);
+          const tokenURI = await silverbacksNFTContract.tokenURI(tokenId);
           log(`Silverbacks NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
           let metadata = {};
           try {
@@ -197,18 +190,14 @@ const AdminPage = ({ currentAccount }) => {
     }
     // Load King Louis NFTs
     if (contractAddresses.multiTokenNFT) {
-      const kinglouisNFTContract = new ethers.Contract(
-        contractAddresses.multiTokenNFT,
-        nftABI,
-        provider
-      );
+      const kinglouisNFTContract = new ethers.Contract(contractAddresses.multiTokenNFT, nftABI, provider);
       try {
-        const count = await kinglouisNFTContract.balanceOf(currentAccount, { blockTag: "latest" });
+        const count = await kinglouisNFTContract.balanceOf(currentAccount);
         log("You own " + count.toNumber() + " King Louis NFTs.");
         for (let i = 0; i < count.toNumber(); i++) {
-          const tokenId = await kinglouisNFTContract.tokenOfOwnerByIndex(currentAccount, i, { blockTag: "latest" });
-          const faceVal = await kinglouisNFTContract.faceValue(tokenId, { blockTag: "latest" });
-          const tokenURI = await kinglouisNFTContract.tokenURI(tokenId, { blockTag: "latest" });
+          const tokenId = await kinglouisNFTContract.tokenOfOwnerByIndex(currentAccount, i);
+          const faceVal = await kinglouisNFTContract.faceValue(tokenId);
+          const tokenURI = await kinglouisNFTContract.tokenURI(tokenId);
           log(`King Louis NFT => tokenId=${tokenId}, faceValue=${faceVal}, tokenURI=${tokenURI}`);
           let metadata = {};
           try {
@@ -246,7 +235,7 @@ const AdminPage = ({ currentAccount }) => {
   }, [currentAccount, contractAddresses]);
 
   // -------------------------------------
-  // Load ERC20 token balances for connected wallet (with blockTag override)
+  // Load ERC20 token balances for connected wallet.
   // -------------------------------------
   const loadTokenBalances = async () => {
     if (!currentAccount || !contractAddresses) return;
@@ -254,22 +243,22 @@ const AdminPage = ({ currentAccount }) => {
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       if (contractAddresses.stableCoin) {
         const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, provider);
-        const balance = await stableCoinContract.balanceOf(currentAccount, { blockTag: "latest" });
+        const balance = await stableCoinContract.balanceOf(currentAccount);
         setStableCoinBalance(ethers.utils.formatEther(balance));
       }
       if (contractAddresses.wbtc) {
         const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, provider);
-        const balance = await wbtcContract.balanceOf(currentAccount, { blockTag: "latest" });
+        const balance = await wbtcContract.balanceOf(currentAccount);
         setWbtcBalance(ethers.utils.formatEther(balance));
       }
       if (contractAddresses.weth) {
         const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, provider);
-        const balance = await wethContract.balanceOf(currentAccount, { blockTag: "latest" });
+        const balance = await wethContract.balanceOf(currentAccount);
         setWethBalance(ethers.utils.formatEther(balance));
       }
       if (contractAddresses.wltc) {
         const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, provider);
-        const balance = await wltcContract.balanceOf(currentAccount, { blockTag: "latest" });
+        const balance = await wltcContract.balanceOf(currentAccount);
         setWltcBalance(ethers.utils.formatEther(balance));
       }
     } catch (error) {
@@ -329,22 +318,6 @@ const AdminPage = ({ currentAccount }) => {
       : contractAddresses.multiTokenVault;
   };
 
-  // --------------------------------------------------
-  // Helper function to safely approve token allowances.
-  // Passes a blockTag override and gasLimit to fix unichain errors.
-  // --------------------------------------------------
-  const safeApprove = async (tokenContract, tokenSymbol, spender, amount) => {
-    const currentAllowance = await tokenContract.allowance(currentAccount, spender, { blockTag: "latest" });
-    if (currentAllowance.gt(0)) {
-      log(`Resetting ${tokenSymbol} allowance to 0...`);
-      let tx = await tokenContract.approve(spender, 0, { gasLimit: 100000 });
-      await tx.wait();
-    }
-    log(`Approving vault to spend ${ethers.utils.formatUnits(amount, 18)} ${tokenSymbol}...`);
-    let tx = await tokenContract.approve(spender, amount, { gasLimit: 100000 });
-    await tx.wait();
-  };
-
   // -------------------------------------
   // Silverbacks Deposit Functions
   // -------------------------------------
@@ -400,7 +373,7 @@ const AdminPage = ({ currentAccount }) => {
       const signer = provider.getSigner();
       const stableCoinContract = new ethers.Contract(contractAddresses.stableCoin, stableCoinABI, signer);
       let approveTx = await stableCoinContract.approve(getVaultAddress(), depositWei);
-      log("Approving vault for 100 tokens...");
+      log("Approving vault to spend 100 tokens...");
       await approveTx.wait();
       log("Approval confirmed.");
       const vaultContract = new ethers.Contract(getVaultAddress(), vaultABI, signer);
@@ -414,81 +387,6 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  // -------------------------------------
-  // King Louis Deposit Functions
-  // -------------------------------------
-  const handleDepositKingLouis = async () => {
-    if (!frontImageFile || !backImageFile) {
-      alert("Please select both front and back images.");
-      return;
-    }
-    try {
-      const metaURI = await uploadMetadataToIPFS(frontImageFile, backImageFile);
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      const vaultAddress = getVaultAddress();
-      if (!vaultAddress) {
-        alert("Vault address not found for selected NFT type.");
-        return;
-      }
-      // Approve each token (for King Louis, tokens like WBTC, WETH, WLTC are required)
-      const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
-      const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
-      const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
-      await safeApprove(wbtcContract, "WBTC", vaultAddress, REQUIRED_WBTC);
-      await safeApprove(wethContract, "WETH", vaultAddress, REQUIRED_WETH);
-      await safeApprove(wltcContract, "WLTC", vaultAddress, REQUIRED_WLTC);
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      // Pass 0 as the dummy deposit amount for King Louis
-      let tx = await vaultContract.deposit(0, metaURI);
-      log("Depositing tokens and minting King Louis NFT...");
-      await tx.wait();
-      log("Deposit transaction confirmed!");
-      loadData();
-    } catch (err) {
-      log("Error in King Louis deposit: " + err.message);
-    }
-  };
-
-  const handleDepositToKingLouis = async () => {
-    if (!depositRecipient || !ethers.utils.isAddress(depositRecipient)) {
-      alert("Please enter a valid recipient address.");
-      return;
-    }
-    if (!frontImageFile || !backImageFile) {
-      alert("Please select both front and back images.");
-      return;
-    }
-    try {
-      const metaURI = await uploadMetadataToIPFS(frontImageFile, backImageFile);
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      const signer = provider.getSigner();
-      const vaultAddress = getVaultAddress();
-      if (!vaultAddress) {
-        alert("Vault address not found for selected NFT type.");
-        return;
-      }
-      const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
-      const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
-      const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
-      await safeApprove(wbtcContract, "WBTC", vaultAddress, REQUIRED_WBTC);
-      await safeApprove(wethContract, "WETH", vaultAddress, REQUIRED_WETH);
-      await safeApprove(wltcContract, "WLTC", vaultAddress, REQUIRED_WLTC);
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      // Pass 0 as the dummy deposit amount for King Louis
-      let tx = await vaultContract.depositTo(depositRecipient, 0, metaURI);
-      log("Depositing tokens and minting King Louis NFT to " + depositRecipient + "...");
-      await tx.wait();
-      log("DepositTo transaction confirmed!");
-      loadData();
-    } catch (err) {
-      log("Error in King Louis depositTo: " + err.message);
-    }
-  };
-
-  // -------------------------------------
-  // CSV Batch Deposit Functions (Silverbacks & King Louis)
-  // -------------------------------------
   const handleCSVDeposit = async () => {
     if (!csvFile) {
       alert("Please select a CSV file.");
@@ -545,43 +443,16 @@ const AdminPage = ({ currentAccount }) => {
     }
   };
 
-  const handleCSVDepositKingLouis = async () => {
-    if (!csvFile) {
-      alert("Please select a CSV file.");
+  // -------------------------------------
+  // King Louis Deposit Functions
+  // -------------------------------------
+  const handleDepositKingLouis = async () => {
+    if (!frontImageFile || !backImageFile) {
+      alert("Please select both front and back images.");
       return;
     }
     try {
-      const fileText = await csvFile.text();
-      const rows = fileText.split("\n").filter((row) => row.trim() !== "");
-      const recipients = [];
-      const metadataURIs = [];
-      const ipfsClient = create({ url: "https://silverbacksipfs.online/api/v0" });
-      for (let row of rows) {
-        const cols = row.split(",");
-        if (cols.length < 3) continue;
-        const recipient = cols[0].trim();
-        const frontURL = cols[1].trim();
-        const backURL = cols[2].trim();
-        if (!ethers.utils.isAddress(recipient)) {
-          log("Invalid address in CSV: " + recipient);
-          continue;
-        }
-        const metadata = {
-          name: "King Louis NFT",
-          description: "A King Louis NFT with exclusive features.",
-          image: frontURL,
-          properties: { imageBack: backURL }
-        };
-        const metadataAdded = await ipfsClient.add(JSON.stringify(metadata));
-        const metaURI = "ipfs://" + metadataAdded.path;
-        recipients.push(recipient);
-        metadataURIs.push(metaURI);
-        log(`Processed CSV row for ${recipient}. Metadata URI: ${metaURI}`);
-      }
-      if (recipients.length === 0) {
-        alert("No valid entries found in CSV.");
-        return;
-      }
+      const metaURI = await uploadMetadataToIPFS(frontImageFile, backImageFile);
       const provider = new ethers.providers.Web3Provider(window.ethereum);
       const signer = provider.getSigner();
       const vaultAddress = getVaultAddress();
@@ -589,24 +460,70 @@ const AdminPage = ({ currentAccount }) => {
         alert("Vault address not found for selected NFT type.");
         return;
       }
-      // Calculate total token amounts required
-      const totalWbtc = REQUIRED_WBTC.mul(recipients.length);
-      const totalWeth = REQUIRED_WETH.mul(recipients.length);
-      const totalWltc = REQUIRED_WLTC.mul(recipients.length);
+      // Approve each token (for King Louis, tokens like WBTC, WETH, WLTC are required)
       const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
       const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
       const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
-      await safeApprove(wbtcContract, "WBTC", vaultAddress, totalWbtc);
-      await safeApprove(wethContract, "WETH", vaultAddress, totalWeth);
-      await safeApprove(wltcContract, "WLTC", vaultAddress, totalWltc);
-      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
-      let tx = await vaultContract.batchDeposit(recipients, metadataURIs);
-      log("Batch deposit transaction submitted for King Louis NFTs...");
+      let tx = await wbtcContract.approve(vaultAddress, REQUIRED_WBTC);
+      log("Approving vault to spend 0.05 WBTC...");
       await tx.wait();
-      log("Batch deposit transaction confirmed!");
+      tx = await wethContract.approve(vaultAddress, REQUIRED_WETH);
+      log("Approving vault to spend 0.5 WETH...");
+      await tx.wait();
+      tx = await wltcContract.approve(vaultAddress, REQUIRED_WLTC);
+      log("Approving vault to spend 3 WLTC...");
+      await tx.wait();
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      // Pass 0 as the dummy deposit amount for King Louis
+      tx = await vaultContract.deposit(0, metaURI);
+      log("Depositing tokens and minting King Louis NFT...");
+      await tx.wait();
+      log("Deposit transaction confirmed!");
       loadData();
     } catch (err) {
-      log("Error in CSV deposit: " + err.message);
+      log("Error in King Louis deposit: " + err.message);
+    }
+  };
+
+  const handleDepositToKingLouis = async () => {
+    if (!depositRecipient || !ethers.utils.isAddress(depositRecipient)) {
+      alert("Please enter a valid recipient address.");
+      return;
+    }
+    if (!frontImageFile || !backImageFile) {
+      alert("Please select both front and back images.");
+      return;
+    }
+    try {
+      const metaURI = await uploadMetadataToIPFS(frontImageFile, backImageFile);
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const vaultAddress = getVaultAddress();
+      if (!vaultAddress) {
+        alert("Vault address not found for selected NFT type.");
+        return;
+      }
+      const wbtcContract = new ethers.Contract(contractAddresses.wbtc, stableCoinABI, signer);
+      const wethContract = new ethers.Contract(contractAddresses.weth, stableCoinABI, signer);
+      const wltcContract = new ethers.Contract(contractAddresses.wltc, stableCoinABI, signer);
+      let tx = await wbtcContract.approve(vaultAddress, REQUIRED_WBTC);
+      log("Approving vault to spend 0.05 WBTC...");
+      await tx.wait();
+      tx = await wethContract.approve(vaultAddress, REQUIRED_WETH);
+      log("Approving vault to spend 0.5 WETH...");
+      await tx.wait();
+      tx = await wltcContract.approve(vaultAddress, REQUIRED_WLTC);
+      log("Approving vault to spend 3 WLTC...");
+      await tx.wait();
+      const vaultContract = new ethers.Contract(vaultAddress, vaultABI, signer);
+      // Pass 0 as the dummy deposit amount for King Louis
+      tx = await vaultContract.depositTo(depositRecipient, 0, metaURI);
+      log("Depositing tokens and minting King Louis NFT to " + depositRecipient + "...");
+      await tx.wait();
+      log("DepositTo transaction confirmed!");
+      loadData();
+    } catch (err) {
+      log("Error in King Louis depositTo: " + err.message);
     }
   };
 

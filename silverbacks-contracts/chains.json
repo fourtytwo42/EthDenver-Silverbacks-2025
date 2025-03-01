@@ -168,16 +168,16 @@
     },
     "contracts": {
       "silverbacks": {
-        "stableCoin": "0x0C3a2419E2885B52B6E468cE24A0101160dF2215",
-        "silverbacksNFT": "0xcfB147dadF551265872B70aF26B99A3560bd0Bc0",
-        "vault": "0xe29324a6753b39Ed8f580c8A2578473F84e781ab"
+        "stableCoin": "0xe101FB315a64cDa9944E570a7bFfaFE60b994b1D",
+        "silverbacksNFT": "0x2C97f946cbD9d10521522D99034274e4bcfa09Ab",
+        "vault": "0xa011824fE07aE156BD88846F25238b75C8EA883a"
       },
       "kingLouis": {
-        "wbtc": "0x2ff0c3C6Dc8e91B68A21e0B5EaA749Bd6726F591",
-        "weth": "0x92557Be585DA9256D0c472E6768C9fCf1621F236",
-        "wltc": "0x54E8B98673ED89301A7307daCa930671a8d83210",
-        "multiTokenNFT": "0x1732b8Ed209Be0DE28020894f45E2346a0979d89",
-        "multiTokenVault": "0x37D1E36c90376dff9812F7837587FF9edfCF90cd"
+        "wbtc": "0x547Bf03FCe8cd33bb4E2150Cc3935770fC66BDab",
+        "weth": "0x4e86eB85DA4F4aFd6A792255a3c45e4d5Be2A432",
+        "wltc": "0x327DEdaa3d61211c65Af7dafC85dEBF971095485",
+        "multiTokenNFT": "0x3925822996C51a04E0F249ecA115519C95Ddd507",
+        "multiTokenVault": "0x67C0da2Dc021Bf54F25C7336c587E8f581F1bC9b"
       }
     }
   },
